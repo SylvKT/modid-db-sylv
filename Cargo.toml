@@ -1,0 +1,8 @@
+[package]
+name = "modid-db-sylv"
+description = "Searches Modrinth and other places for mod IDs and adds them to the mod ID database. This can be used to check if a mod ID has already been taken by another mod."
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.67"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
