@@ -1,3 +1,5 @@
+mod test;
+
 use std::env;
 use std::fs::write;
 use std::process::exit;
