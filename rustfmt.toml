@@ -1,0 +1,4 @@
+tab_spaces = 4
+hard_tabs = true
+newline_style = "Unix"
+indent_style = "Tab"
