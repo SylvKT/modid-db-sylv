@@ -11,8 +11,8 @@ jobs:
           rustup update stable
       - name: Run tests
         run: cargo test
-      - name: Run
-        run: cargo run
+#      - name: Run
+#        run: cargo run
 #       - name: Lint
 #         run: cargo clippy
 #       - name: Check formatting

@@ -3,11 +3,16 @@ name = "modid-db-sylv"
 description = "Searches Modrinth and other places for mod IDs and adds them to the mod ID database. This can be used to check if a mod ID has already been taken by another mod."
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.69" # interesting
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.28.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.28", features = ["macros", "rt-multi-thread"] }
 reqwest = "0.11.17"
-serde = { version = "1.0.162", features = ["derive"] }
-serde_json = "1.0.96"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ferinth = { git = "https://github.com/SylvKT/ferinth.git", branch = "search" }
+owo-colors = "3"
+time = "0.3.21"
+actix-web = "4"
