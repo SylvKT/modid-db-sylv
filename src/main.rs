@@ -9,7 +9,7 @@ fn main() {
 		.worker_threads(1)
 		.thread_name("jar-scan")
 		.build()
-		.expect("Failed to create tokio runtime");
+		.expect("Failed to create tokio runtime \"jar-scan\"");
 	
 	runtime.spawn(jar_loop());
 }
