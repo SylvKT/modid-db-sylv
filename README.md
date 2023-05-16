@@ -1,4 +1,7 @@
-# modid-db-sylv
+# Sylv API
+The backend for [sylv.gay](https://sylv.gay/).
+
+## Mod ID Database
 
 Searches Modrinth and other places for mod IDs and adds them to the mod ID database. This can be used to check if a mod ID has already been taken by another mod.
 
