@@ -1,6 +1,6 @@
 [package]
-name = "modid-db-sylv"
-description = "Searches Modrinth and other places for mod IDs and adds them to the mod ID database. This can be used to check if a mod ID has already been taken by another mod."
+name = "sylv-api"
+description = "The backend for sylv.gay."
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.69" # interesting
@@ -16,3 +16,5 @@ ferinth = { git = "https://github.com/SylvKT/ferinth.git", branch = "search" }
 owo-colors = "3"
 time = "0.3.21"
 actix-web = "4"
+sqlx = { version = "0.6.2", features = ["runtime-actix-rustls", "postgres", "offline", "macros", "json", "offline"] }
+pico-args = "0.5.0"
