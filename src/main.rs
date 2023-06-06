@@ -29,7 +29,7 @@ fn main() {
 		.build()
 		.expect("Failed to create tokio runtime \"jar-scan\"");
 
-	runtime.spawn(jar_loop());
+	//runtime.spawn(jar_loop());
 }
 
 async fn server_main() {

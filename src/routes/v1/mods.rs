@@ -1,3 +1,5 @@
+// maybe naming this "mods" was a bad idea 😅
+
 use actix_web::{get, HttpRequest, HttpResponse, web};
 use actix_web::http::StatusCode;
 use actix_web::web::ServiceConfig;
@@ -28,6 +30,9 @@ pub struct Mod {
 	platform: Platform,
 }
 
+// BEGIN TOMFUCKERY
+
+// TODO: fuck
 impl ::sqlx::encode::Encode<'_, sqlx::Postgres> for Mod
 	where
 		String: for<'q> ::sqlx::encode::Encode<'q, sqlx::Postgres>,
@@ -84,6 +89,8 @@ impl ::sqlx::encode::Encode<'_, sqlx::Postgres> for Mod
 	}
 }
 
+// this is where the important part and the reason we're doing this
+// see: https://github.com/launchbadge/sqlx/issues/1031
 impl<'r> sqlx::decode::Decode<'r, sqlx::Postgres> for Mod
 	where
 		String: sqlx::types::Type<sqlx::Postgres>,
@@ -129,6 +136,8 @@ impl ::sqlx::Type<sqlx::Postgres> for Mod {
 		sqlx::postgres::PgTypeInfo::with_name("Mod")
 	}
 }
+
+// END TOMFUCKERY
 
 #[derive(Debug, Deserialize)]
 struct IdQuery {
