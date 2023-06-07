@@ -1,12 +1,14 @@
 use std::fs::File;
-use std::io::Write;
+use std::io::{BufReader, Write};
 use std::time::{Duration, SystemTime};
 use ferinth::Ferinth;
+use ferinth::structures::project::Project;
 use ferinth::structures::search::{Facet, Sort};
 use ferinth::structures::version::{Version, VersionFile};
+use sqlx::{Pool, Postgres};
 use time::OffsetDateTime;
 
-pub async fn jar_loop() {
+pub async fn jar_loop(pool: &Pool<Postgres>) {
 	let mut interval = tokio::time::interval(Duration::from_secs(30 * 60));
 	loop {
 		if OffsetDateTime::from(SystemTime::now()).minute() % 30 == 0 {
@@ -17,12 +19,12 @@ pub async fn jar_loop() {
 	loop {
 		interval.tick().await;
 		println!("Checking latest .jar's...");
-		get_fucking_jars()
+		get_fucking_jars(pool)
 			.await;
 	}
 }
 
-pub async fn get_fucking_jars() {
+pub async fn get_fucking_jars(pool: &Pool<Postgres>) {
 	let allowed_loaders = ["quilt", "fabric"];
 	let mut facets: Vec<Vec<Facet>> = vec![];
 	
@@ -65,7 +67,7 @@ pub async fn get_fucking_jars() {
 	}
 	
 	// Request each project's latest .jar
-	let mut jar_files: Vec<Vec<File>> = vec![];
+	let mut projects: Vec<(Vec<File>, Project, String)> = vec![];
 	for hit in res.hits {
 		let project = fer.get_project(&*hit.project_id)
 			.await
@@ -93,9 +95,20 @@ pub async fn get_fucking_jars() {
 		if hit_versions == 1 { // notify the user
 			println!("Successfully downloaded .jar for {} ({}/{})!", project.title, project.slug, project.id);
 		}
-		
-		jar_files.push(hit_version_files)
+
+		// Retrieve the mod ID from the fabric.mod.json or quilt.mod.json
+		let id = {
+			// verify all of the IDs are the same
+			let ids = vec![];
+			for file in hit_version_files {
+				let reader = BufReader::new(file);
+				let mut archive = zip::ZipArchive::new(reader).expect("Failed to open archive");
+			}
+		};
+
+		let project = fer.get_project(&*hit.project_id)
+			.await
+			.expect("Failed to retrieve project");
+		projects.push((hit_version_files, project, id));
 	}
-	
-	// Unzip the .jar and retrieve the mod ID from the fabric.mod.json or quilt.mod.json
 }

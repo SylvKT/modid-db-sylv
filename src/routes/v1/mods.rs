@@ -3,6 +3,7 @@
 use actix_web::{get, HttpRequest, HttpResponse, web};
 use actix_web::http::StatusCode;
 use actix_web::web::ServiceConfig;
+use ferinth::structures::ID;
 use serde::{Serialize, Deserialize};
 use sqlx::{PgPool};
 use crate::routes::ApiError;
@@ -11,6 +12,7 @@ pub fn config(cfg: &mut ServiceConfig) {
 	cfg.service(
 		web::scope("/mods")
 			.service(get_from_id)
+			.service(get_from_project_id)
 	);
 }
 
@@ -139,25 +141,41 @@ impl ::sqlx::Type<sqlx::Postgres> for Mod {
 
 // END TOMFUCKERY
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct IdQuery {
 	pub id: String,
 }
 
 #[get("/get")]
 async fn get_from_id(
-	_req: HttpRequest,
-	web::Query(id): web::Query<IdQuery>,
+	web::Query(query): web::Query<IdQuery>,
 	pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ApiError> {
 	let mods = sqlx::query_as!(
 		Mod,
 		r#"SELECT id, name, description, thumbnail, project_id, platform as "platform: _" FROM mods WHERE id = $1;"#,
-		id.id,
+		query.id,
 	)
 		.fetch_all(&**pool)
 		.await?;
 	let res = HttpResponse::build(StatusCode::OK)
+		.json(mods);
+	Ok(res)
+}
+
+#[get("/{project_id}")]
+async fn get_from_project_id(
+	path: web::Path<ID>,
+	pool: web::Data<PgPool>,
+) -> Result<HttpResponse, ApiError> {
+	let mods = sqlx::query_as!(
+		Mod,
+		r#"SELECT id, name, description, thumbnail, project_id, platform as "platform: _" FROM mods WHERE project_id = $1;"#,
+		path.into_inner(),
+	)
+		.fetch_one(&**pool)
+		.await?;
+	let res = HttpResponse::Ok()
 		.json(mods);
 	Ok(res)
 }
