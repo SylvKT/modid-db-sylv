@@ -24,12 +24,12 @@ pub enum Platform {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mod {
-	id: String,
-	name: String,
-	description: Option<String>,
-	thumbnail: Option<String>,
-	project_id: String,
-	platform: Platform,
+	pub id: String,
+	pub name: String,
+	pub description: Option<String>,
+	pub thumbnail: Option<String>,
+	pub project_id: String,
+	pub platform: Platform,
 }
 
 // BEGIN TOMFUCKERY

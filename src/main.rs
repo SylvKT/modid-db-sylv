@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
 use sqlx::postgres::PgPoolOptions;
 use crate::routes::{ApiError, v1};
-use crate::task::retrieve_jar::jar_loop;
+use crate::task::retrieve_jar::{get_fucking_jars, jar_loop};
 
 #[actix_web::main]
 async fn main() {
@@ -23,13 +23,14 @@ async fn main() {
 		.await
 		.expect("Failed to connect to Postgres database.");
 
+	let pool_ref = pool.clone();
+
 	// Spawn other runtimes
-	thread::spawn(|| {
-		spawn_runtimes(&pool);
+	thread::spawn(move || {
+		spawn_runtimes(pool.clone());
 	});
 	
 	// Start actix server
-	let pool_ref = pool.clone();
 	let server = HttpServer::new(move || {
 		App::new()
 			.app_data(web::Data::new(pool_ref.clone()))
@@ -42,7 +43,7 @@ async fn main() {
 		.await;
 }
 
-fn spawn_runtimes(pool: &Pool<Postgres>) {
+fn spawn_runtimes(pool: Pool<Postgres>) {
 	let runtime = tokio::runtime::Builder::new_multi_thread()
 		.enable_time()
 		.worker_threads(1)
