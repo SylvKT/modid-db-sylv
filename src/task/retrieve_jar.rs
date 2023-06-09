@@ -24,6 +24,8 @@ pub enum JarError {
 	HttpError(#[from] reqwest::Error),
 	#[error("Ferinth Error: {0}")]
 	FerinthError(#[from] ferinth::Error),
+	#[error("SQL Database Error: {0}")]
+	SqlError(#[from] sqlx::Error)
 }
 
 pub async fn jar_loop(pool: PgPool) {
@@ -156,12 +158,10 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 			id_ret
 		};
 
-		let project = fer.get_project(&*hit.project_id)
-			.await
-			.expect("Failed to retrieve project");
+		let project = fer.get_project(&*hit.project_id).await?;
 		projects.push((project, id));
 	}
-
+	
 	for (project, id) in projects {
 		// query database with project id
 		let mod_opt = query_as!(
@@ -169,21 +169,22 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 			r#"SELECT id, name, description, thumbnail, project_id, platform as "platform: _" FROM mods WHERE project_id = $1"#,
 			project.id.to_string()
 		)
-			.fetch_optional(&*pool)
-			.await
-			.expect("Failed to query the database");
-		if let Some(r#mod) = mod_opt {
-			if r#mod.id != id {
+			.fetch_optional(&*pool).await?;
+		if let Some(r#mod) = mod_opt { // if the mod exists in the database
+			if r#mod.id != id { // if this mod ID is new (doesn't match)
+				// update the mod ID
 				query!(
 					"UPDATE mods SET id = $1 WHERE project_id = $2",
 					id,
 					project.id.to_string()
 				)
-					.execute(&*pool)
-					.await
-					.expect("Failed to set mod ID");
+					.execute(&*pool).await?
 			}
+			// if name doesn't match
+			// if description doesn't match
+			// if thumbnail doesn't match
 		} else {
+			// add mod to database
 			let mut icon_url: Option<String> = None;
 			if project.icon_url.is_some() {
 				icon_url = Some(project.icon_url.unwrap().to_string());
@@ -197,9 +198,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 				project.id.to_string(),
 				Platform::Modrinth as Platform
 			)
-				.execute(&*pool)
-				.await
-				.expect("Failed to insert new mod to database");
+				.execute(&*pool).await?;
 		}
 	}
 	Ok(())
