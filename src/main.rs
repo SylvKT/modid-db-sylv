@@ -1,3 +1,5 @@
+extern crate alloc;
+
 mod test;
 mod task;
 mod routes;
