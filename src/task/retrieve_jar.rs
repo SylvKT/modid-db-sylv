@@ -1,33 +1,52 @@
 use std::fs::File;
-use std::io::{BufReader, Read, Write};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+use async_zip::base::read::seek::ZipFileReader;
 use ferinth::Ferinth;
 use ferinth::structures::project::Project;
 use ferinth::structures::search::{Facet, Sort};
 use ferinth::structures::version::{Version, VersionFile};
-use serde::Deserialize;
-use sqlx::{PgPool, Postgres, query, query_as};
+use serde::{Deserialize, Serialize};
+use sqlx::{PgPool, query, query_as};
 use time::OffsetDateTime;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::routes;
 use crate::routes::v1::mods::Platform;
 
-pub async fn jar_loop(pool: PgPool) {
-	let mut interval = tokio::time::interval(Duration::from_secs(30 * 60));
-	loop {
-		if OffsetDateTime::from(SystemTime::now()).minute() % 30 == 0 {
-			break;
-		}
-	}
-	
-	loop {
-		interval.tick().await;
-		println!("Checking latest .jar's...");
-		get_fucking_jars(&pool)
-			.await;
-	}
+#[derive(Debug, thiserror::Error)]
+pub enum JarError {
+	#[error("Zip Error: {0}")]
+	ZipError(#[from] async_zip::error::ZipError),
+	#[error("I/O Error: {0}")]
+	IoError(#[from] std::io::Error),
+	#[error("HTTP Request Error: {0}")]
+	HttpError(#[from] reqwest::Error),
+	#[error("Ferinth Error: {0}")]
+	FerinthError(#[from] ferinth::Error),
 }
 
-pub async fn get_fucking_jars(pool: &PgPool) {
+pub async fn jar_loop(pool: PgPool) {
+	println!("Checking latest .jar's...");
+	get_fucking_jars(&pool)
+		.await
+		.expect("Failed to fetch .jar's");
+	// let mut interval = tokio::time::interval(Duration::from_secs(30 * 60));
+	// loop {
+	// 	if OffsetDateTime::from(SystemTime::now()).minute() % 30 == 0 {
+	// 		break;
+	// 	}
+	// }
+	//
+	// loop {
+	// 	interval.tick().await;
+	// 	println!("Checking latest .jar's...");
+	// 	get_fucking_jars(&pool)
+	// 		.await;
+	// }
+}
+
+pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	let allowed_loaders = ["quilt", "fabric"];
 	let mut facets: Vec<Vec<Facet>> = vec![];
 	
@@ -36,16 +55,13 @@ pub async fn get_fucking_jars(pool: &PgPool) {
 	}
 	let facets: Vec<&[Facet]> = facets.iter().map(|term| term.as_slice()).collect();
 	
-	let fer = Ferinth::new("SylvKT@github.com/modid-db-sylv", None, Some("mailto:contact@sylv.gay") /* just in case they didn't get the memo */, None)
-		.expect("Failed to initialize Ferinth instance");
+	let fer = Ferinth::new("SylvKT@github.com/modid-db-sylv", None, Some("mailto:contact@sylv.gay") /* just in case they didn't get the memo */, None)?;
 	
 	// Request newest projects
-	let res = fer.search("", &Sort::Newest, facets.as_slice())
-		.await
-		.expect("Failed to search for projects");
+	let res = fer.search("", &Sort::Newest, facets.as_slice()).await?;
 	
 	// put this shit here because fuck it, we ball
-	async fn download_file_from_ver(ver: &Version) -> File {
+	async fn download_file_from_ver(ver: Version) -> Result<PathBuf, JarError> {
 		// i like boys
 		let mut primary: Option<&VersionFile> = None;
 		for ver_file in &ver.files {
@@ -56,17 +72,12 @@ pub async fn get_fucking_jars(pool: &PgPool) {
 		}
 		
 		let ver_file = primary.unwrap_or(ver.files.first().unwrap()); // use first because i'm lazy
-		let res = reqwest::get(ver_file.url.clone() /* i'm so sorry, ferris */)
-			.await
-			.expect(&*format!("Failed to download {} for version {} ({})", ver_file.filename, ver.name, ver.version_number));
-		let mut file = File::create(&ver_file.filename)
-			.expect(&*format!("Failed to create file {} for version {} ({})", ver_file.filename, ver.name, ver.version_number));
-		let bytes = res.bytes()
-			.await
-			.expect("Failed to get bytes from response");
+		let res = reqwest::get(ver_file.url.clone() /* i'm so sorry, ferris */).await?;
+		let mut file = tokio::fs::File::create(&ver_file.filename).await?;
+		let bytes = res.bytes().await?;
 		let buf: Vec<u8> = bytes.to_vec();
-		file.write(buf.as_slice()).expect("Failed to write to file");
-		file
+		file.write(buf.as_slice()).await?;
+		Ok(Path::new(ver_file.filename.as_str()).to_path_buf())
 	}
 	
 	// Request each project's latest .jar
@@ -78,16 +89,15 @@ pub async fn get_fucking_jars(pool: &PgPool) {
 		println!("Downloading first two jar's for {} ({}/{})...", project.title, project.slug, project.id);
 		
 		let mut hit_version = false; // if a project has passed the filter and have been catalogued
-		let mut hit_version_file: Option<File> = None;
+		let mut hit_version_file: Option<PathBuf> = None;
 		for ver_id in project.versions {
-			let ver = fer.get_version(&ver_id)
-				.await
-				.expect("Failed to get jar");
+			let ver = fer.get_version(&ver_id).await?;
 			if !ver.loaders.iter().any(|x| allowed_loaders.contains(&x.as_str())) {
 				break // ;-; haha just like me fr r/im14andthisisdeep r/ihavereddit
 			}
 			
-			hit_version_file = Some(download_file_from_ver(&ver).await);
+			let downloaded_file = download_file_from_ver(ver).await?;
+			hit_version_file = Some(downloaded_file);
 			hit_version = true;
 			// we downloaded the file! yay!!
 			println!("Successfully downloaded .jar's for {} ({}/{})!", project.title, project.slug, project.id);
@@ -97,25 +107,24 @@ pub async fn get_fucking_jars(pool: &PgPool) {
 		if hit_version { // notify the user
 			println!("Successfully downloaded .jar for {} ({}/{})!", project.title, project.slug, project.id);
 		}
-
+		
 		// Retrieve the mod ID from the fabric.mod.json or quilt.mod.json
-		let id = {
-			let mut id_ret = String::new();
+		let id = { // i'm documenting this code for your dumb ass because i know you'll forget about it
+			let mut id_ret = String::new(); // we return this later; this is the id
+			let hit_version_file = hit_version_file.unwrap(); // unwrap the hit version file once (to prevent move issues)
 			// get id from latest version
-			let file = &hit_version_file.unwrap();
-			let reader = BufReader::new(file);
-			let archive = zip::ZipArchive::new(reader).expect("Failed to open archive");
-			for filename in archive.file_names() {
-				// open it a second time because we immutably borrowed it
-				let reader = BufReader::new(file);
-				let mut archive = zip::ZipArchive::new(reader).expect("Failed to open archive");
-
-				let mut file = archive.by_name(filename)
-					.expect("Failed to open embedded file in zip");
+			let mut file = tokio::fs::File::open(hit_version_file).await?;
+			// open zip reader (with tokio)
+			let mut zip_reader = ZipFileReader::with_tokio(&mut file).await?;
+			let zip = zip_reader.file();
+			for index in 0..zip.entries().len() { // iterate over our zip entries old-school
+				// open file reader
+				let mut reader = zip_reader.reader_with_entry(index).await?;
+				// read the file
 				let mut string = String::new();
-				file.read_to_string(&mut string)
-					.expect("Failed to read file");
-				match filename {
+				reader.read_to_string_checked(&mut string).await?;
+				let entry = reader.entry();
+				match entry.filename().as_str().unwrap() {
 					"fabric.mod.json" => {
 						#[derive(Deserialize)]
 						struct Fmj {
@@ -193,4 +202,5 @@ pub async fn get_fucking_jars(pool: &PgPool) {
 				.expect("Failed to insert new mod to database");
 		}
 	}
+	Ok(())
 }

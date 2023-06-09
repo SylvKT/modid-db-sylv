@@ -19,4 +19,5 @@ actix-web = "4"
 sqlx = { version = "0.6.2", features = ["runtime-actix-rustls", "postgres", "offline", "macros", "json", "offline"] }
 pico-args = "0.5.0"
 thiserror = "1"
-zip = "0.6.6"
+#zip = "0.6.6"
+async_zip = { version = "0.0.15", features = ["full"] }

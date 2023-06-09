@@ -26,9 +26,15 @@ async fn main() {
 	let pool_ref = pool.clone();
 
 	// Spawn other runtimes
-	thread::spawn(move || {
-		spawn_runtimes(pool.clone());
-	});
+	let runtime = tokio::runtime::Builder::new_multi_thread()
+		.enable_time()
+		.enable_io()
+		.worker_threads(1)
+		.thread_name("jar-scan")
+		.build()
+		.expect("Failed to create tokio runtime \"jar-scan\"");
+
+	runtime.spawn(jar_loop(pool));
 	
 	// Start actix server
 	let server = HttpServer::new(move || {
@@ -41,17 +47,6 @@ async fn main() {
 		.expect("Failed to bind to address")
 		.run()
 		.await;
-}
-
-fn spawn_runtimes(pool: Pool<Postgres>) {
-	let runtime = tokio::runtime::Builder::new_multi_thread()
-		.enable_time()
-		.worker_threads(1)
-		.thread_name("jar-scan")
-		.build()
-		.expect("Failed to create tokio runtime \"jar-scan\"");
-
-	runtime.spawn(jar_loop(pool));
 }
 
 // not copied from Labrinth i swear
