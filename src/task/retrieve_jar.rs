@@ -3,6 +3,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use async_zip::base::read::seek::ZipFileReader;
+use async_zip::error::ZipError;
 use ferinth::Ferinth;
 use ferinth::structures::ID;
 use ferinth::structures::project::Project;
@@ -104,10 +105,9 @@ pub async fn get_latest_jar(fer: &Ferinth, project_id: &ID) -> Result<(Project, 
 		let mut id_ret = String::new(); // we return this later; this is the id
 		let hit_version_file = hit_version_file?.unwrap(); // unwrap the hit version file once (to prevent move issues)
 		// get id from latest version
-		let mut file = tokio::fs::File::open(hit_version_file).await?;
+		let mut file = tokio::fs::File::open(hit_version_file.clone()).await?;
 		// open zip reader (with tokio)
 		let mut zip_reader = ZipFileReader::with_tokio(&mut file).await?;
-		println!("e");
 		let zip = zip_reader.file();
 		for index in 0..zip.entries().len() { // iterate over our zip entries old-school
 			// open file reader
@@ -150,6 +150,7 @@ pub async fn get_latest_jar(fer: &Ferinth, project_id: &ID) -> Result<(Project, 
 			println!("Mod has no fabric.mod.json or quilt.mod.json");
 			println!("This should not happen unless there is a fork of Fabric or Quilt!");
 		}
+		tokio::fs::remove_file(&*hit_version_file).await?;
 		Ok(id_ret)
 	};
 	
@@ -175,12 +176,14 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	for hit in res.hits {
 		let project_result = get_latest_jar(&fer, &hit.project_id).await;
 		if project_result.is_err() {
-			// check if this is a compat error
+			// check if this is a compat or EOCDR error
 			let err = project_result.err().unwrap();
 			if match err {
 				JarError::CompatError(_) => true,
+				JarError::ZipError(ZipError::UnableToLocateEOCDR) => true,
 				_ => false,
 			} { // skip this project
+				eprintln!("{}", err);
 				continue;
 			} else { // this is a normal error; return it
 				return Err(err)
