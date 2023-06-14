@@ -152,7 +152,6 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<String, JarError> {
 		if id_ret.is_empty() {
 			println!("Mod has no fabric.mod.json or quilt.mod.json");
 		}
-		tokio::fs::remove_file(&*path).await?;
 		Ok(id_ret)
 	};
 	
