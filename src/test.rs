@@ -27,15 +27,6 @@ pub async fn jar_test() {
 
 #[actix_web::test]
 pub async fn erroneous_jar_test() {
-	// Connect to database
-	let pool = PgPoolOptions::new()
-		.min_connections(0)
-		.max_connections(16)
-		.max_lifetime(Duration::from_secs(60))
-		.connect(env!("DATABASE_URL"))
-		.await
-		.expect("Failed to connect to Postgres database.");
-	
 	println!("Opening erroneous .jar's...");
 	let mut dir = read_dir(Path::new(".")).await.expect("Failed to read directory");
 	loop {
