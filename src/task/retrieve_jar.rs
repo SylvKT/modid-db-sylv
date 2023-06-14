@@ -103,7 +103,7 @@ pub async fn get_latest_jar(fer: &Ferinth, project_id: &ID) -> Result<(Project, 
 	Ok((project, hit_version_file?.unwrap()))
 }
 
-pub async fn get_id_from_jar(project: Project, path: PathBuf) -> Result<(Project, String), JarError> {
+pub async fn get_id_from_jar(path: PathBuf) -> Result<String, JarError> {
 	// Retrieve the mod ID from the fabric.mod.json or quilt.mod.json
 	let id: Result<String, JarError> = { // i'm documenting this code for your dumb ass because i know you'll forget about it
 		let mut id_ret = String::new(); // we return this later; this is the id
@@ -156,14 +156,14 @@ pub async fn get_id_from_jar(project: Project, path: PathBuf) -> Result<(Project
 		Ok(id_ret)
 	};
 	
-	Ok((project, id?))
+	Ok(id?)
 }
 
 #[async_recursion]
 // cursed attempt to fix the EOCDR error
 // Don't ask why, but this works
-pub async fn attempt_get_id_from_jar(project: Project, path: PathBuf, attempt: u16) -> Result<(Project, String), JarError> {
-	let project_result = get_id_from_jar(project.clone(), path.clone()).await;
+pub async fn attempt_get_id_from_jar(path: PathBuf, attempt: u16) -> Result<String, JarError> {
+	let project_result = get_id_from_jar(path.clone()).await;
 	return if project_result.is_err() {
 		// check if this is a compat or EOCDR error
 		let err = project_result.err().unwrap();
@@ -176,9 +176,9 @@ pub async fn attempt_get_id_from_jar(project: Project, path: PathBuf, attempt: u
 			eprintln!("Attempt #{}", attempt);
 			if attempt > 1 {
 				tokio::time::sleep(Duration::from_secs(1)).await;
-				attempt_get_id_from_jar(project, path, attempt - 1).await
+				attempt_get_id_from_jar(path, attempt - 1).await
 			} else {
-				tokio::fs::remove_file(&*path).await?;
+				// tokio::fs::remove_file(&*path).await?;
 				Err(err)
 			}
 		} else { // this is a normal error; return it
@@ -208,7 +208,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	let mut projects: Vec<(Project, String)> = vec![];
 	for hit in res.hits {
 		let (project, path) = get_latest_jar(&fer, &hit.project_id).await?;
-		let project_result = attempt_get_id_from_jar(project, path, 5).await;
+		let project_result = attempt_get_id_from_jar(path, 5).await;
 		
 		if project_result.is_err() {
 			// check if this is a compat or EOCDR error
@@ -225,7 +225,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 			}
 		}
 		
-		projects.push(project_result.unwrap());
+		projects.push((project, project_result.unwrap()));
 	}
 	
 	// Request newly updated projects
@@ -234,7 +234,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	// second chance
 	for hit in res.hits {
 		let (project, path) = get_latest_jar(&fer, &hit.project_id).await?;
-		let project_result = attempt_get_id_from_jar(project, path, 5).await;
+		let project_result = attempt_get_id_from_jar(path, 5).await;
 		
 		if project_result.is_err() {
 			// check if this is a compat or EOCDR error
@@ -251,7 +251,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 			}
 		}
 		
-		projects.push(project_result.unwrap());
+		projects.push((project, project_result.unwrap()));
 	}
 	
 	for (project, id) in projects {

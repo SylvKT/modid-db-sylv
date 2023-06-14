@@ -151,7 +151,7 @@ async fn get_from_project_id(
 			_ => false,
 		} { // download mod and add id to database
 			let (project, path) = get_latest_jar(fer.as_ref(), &*path).await?;
-			let (project, id) = get_id_from_jar(project, path).await?;
+			let id = get_id_from_jar(path).await?;
 			if id.len() == 0 {
 				return Err(ApiError::Other("Failed to extract mod ID".to_string()))
 			}
