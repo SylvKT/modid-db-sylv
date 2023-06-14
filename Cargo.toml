@@ -21,3 +21,4 @@ pico-args = "0.5.0"
 thiserror = "1"
 #zip = "0.6.6"
 async_zip = { version = "0.0.15", features = ["full"] }
+async-recursion = "1"
