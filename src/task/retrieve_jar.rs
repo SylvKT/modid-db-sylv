@@ -174,7 +174,7 @@ pub async fn attempt_get_id_from_jar(project: Project, path: PathBuf, attempt: u
 		} { // attempt again
 			eprintln!("{}", err);
 			eprintln!("Attempt #{}", attempt);
-			if attempt > 0 {
+			if attempt > 1 {
 				tokio::time::sleep(Duration::from_secs(1)).await;
 				attempt_get_id_from_jar(project, path, attempt - 1).await
 			} else {
