@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use async_recursion::async_recursion;
 use async_zip::base::read::seek::ZipFileReader;
-use async_zip::error::ZipError;
 use ferinth::Ferinth;
 use ferinth::structures::ID;
 use ferinth::structures::project::Project;
@@ -170,7 +169,7 @@ pub async fn attempt_get_id_from_jar(project: Project, path: PathBuf, attempt: u
 		let err = project_result.err().unwrap();
 		return if match err {
 			JarError::CompatError(_) => true,
-			JarError::ZipError(ZipError::UnableToLocateEOCDR) => true,
+			JarError::ZipError(async_zip::error::ZipError::UnableToLocateEOCDR) => true,
 			_ => false,
 		} { // attempt again
 			eprintln!("{}", err);
@@ -212,7 +211,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 			let err = project_result.err().unwrap();
 			if match err {
 				JarError::CompatError(_) => true,
-				JarError::ZipError(ZipError::UnableToLocateEOCDR) => true,
+				JarError::ZipError(async_zip::error::ZipError::UnableToLocateEOCDR) => true,
 				_ => false,
 			} { // skip this project
 				eprintln!("{}", err);
