@@ -175,6 +175,7 @@ pub async fn attempt_get_id_from_jar(project: Project, path: PathBuf, attempt: u
 			eprintln!("{}", err);
 			eprintln!("Attempt #{}", attempt);
 			if attempt > 0 {
+				tokio::time::sleep(Duration::from_secs(1)).await;
 				attempt_get_id_from_jar(project, path, attempt - 1).await
 			} else {
 				tokio::fs::remove_file(&*path).await?;
