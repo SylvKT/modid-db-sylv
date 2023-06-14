@@ -5,8 +5,8 @@ use std::time::{Duration, SystemTime};
 use async_recursion::async_recursion;
 use async_zip::base::read::seek::ZipFileReader;
 use ferinth::Ferinth;
-use ferinth::structures::ID;
-use ferinth::structures::project::Project;
+use ferinth::structures::{ID, Number};
+use ferinth::structures::project::{Project, ProjectType};
 use ferinth::structures::search::{Facet, Sort};
 use ferinth::structures::version::{Version, VersionFile};
 use serde::{Deserialize, Serialize};
@@ -80,17 +80,18 @@ pub async fn download_file_from_ver(ver: Version) -> Result<PathBuf, JarError> {
 }
 
 pub async fn get_latest_jar(fer: &Ferinth, project_id: &ID) -> Result<(Project, PathBuf), JarError> {
-	let project = fer.get_project(&*project_id).await?;
+	let mut project = fer.get_project(&*project_id).await?;
 	println!("Downloading jar for {} ({}/{})...", project.title, project.slug, project.id);
 	
 	let mut hit_version_file: Result<Option<PathBuf>, CompatError> = Ok(None);
+	// reverse list because the last version returned by labrinth is actually the latest version
+	project.versions.reverse();
 	for ver_id in project.versions {
-		let ver = fer.get_version(&ver_id).await?;
+		let ver = fer.get_version(&*ver_id).await?;
 		if !ver.loaders.iter().any(|x| ALLOWED_LOADERS.contains(&x.as_str())) {
 			hit_version_file = Err(CompatError::Loader(format!("{:?}", ver.loaders)));
 			continue
 		}
-		
 		let downloaded_file = download_file_from_ver(ver).await?;
 		hit_version_file = Ok(Some(downloaded_file));
 		// we downloaded the file! yay!!
@@ -150,7 +151,6 @@ pub async fn get_id_from_jar(project: Project, path: PathBuf) -> Result<(Project
 		}
 		if id_ret.is_empty() {
 			println!("Mod has no fabric.mod.json or quilt.mod.json");
-			println!("This should not happen unless there is a fork of Fabric or Quilt!");
 		}
 		tokio::fs::remove_file(&*path).await?;
 		Ok(id_ret)
@@ -175,8 +175,10 @@ pub async fn attempt_get_id_from_jar(project: Project, path: PathBuf, attempt: u
 			eprintln!("{}", err);
 			eprintln!("Attempt #{}", attempt);
 			if attempt > 0 {
+				std::thread::sleep(Duration::from_secs(1));
 				attempt_get_id_from_jar(project, path, attempt - 1).await
 			} else {
+				tokio::fs::remove_file(&*path).await?;
 				Err(err)
 			}
 		} else { // this is a normal error; return it
@@ -193,6 +195,8 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	for loader in ALLOWED_LOADERS {
 		facets.push(vec![Facet::Categories(String::from(*loader))]);
 	}
+	facets.push(vec![Facet::ProjectType(ProjectType::Mod)]);
+	// slice-ify it
 	let facets: Vec<&[Facet]> = facets.iter().map(|term| term.as_slice()).collect();
 	
 	let fer = Ferinth::new("SylvKT@github.com/modid-db-sylv", None, Some("mailto:contact@sylv.gay") /* just in case they didn't get the memo */, None)?;
@@ -224,11 +228,37 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 		projects.push(project_result.unwrap());
 	}
 	
+	// Request newly updated projects
+	let res = fer.search_paged("", &Sort::Updated, &Number::from(30usize), &Number::from(0usize), facets.as_slice()).await?;
+	
+	// second chance
+	for hit in res.hits {
+		let (project, path) = get_latest_jar(&fer, &hit.project_id).await?;
+		let project_result = attempt_get_id_from_jar(project, path, 5).await;
+		
+		if project_result.is_err() {
+			// check if this is a compat or EOCDR error
+			let err = project_result.err().unwrap();
+			if match err {
+				JarError::CompatError(_) => true,
+				JarError::ZipError(async_zip::error::ZipError::UnableToLocateEOCDR) => true,
+				_ => false,
+			} { // skip this project
+				eprintln!("{}", err);
+				continue;
+			} else { // this is a normal error; return it
+				return Err(err)
+			}
+		}
+		
+		projects.push(project_result.unwrap());
+	}
+	
 	for (project, id) in projects {
 		// query database with project id
 		let mod_opt = query_as!(
 			routes::v1::mods::Mod,
-			r#"SELECT id, name, description, thumbnail, project_id, platform as "platform: _" FROM mods WHERE project_id = $1"#,
+			r#"SELECT id, project_id, platform as "platform: _" FROM mods WHERE project_id = $1"#,
 			project.id.to_string()
 		)
 			.fetch_optional(&*pool).await?;
@@ -242,26 +272,17 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 				)
 					.execute(&*pool).await?;
 			}
-			// if name doesn't match
-			// if description doesn't match
-			// if thumbnail doesn't match
 		} else {
 			// add mod to database
-			let mut icon_url: Option<String> = None;
-			if project.icon_url.is_some() {
-				icon_url = Some(project.icon_url.unwrap().to_string());
-			}
 			query!(
-				r#"INSERT INTO mods (id, name, description, thumbnail, project_id, platform) VALUES ($1, $2, $3, $4, $5, $6)"#,
+				r#"INSERT INTO mods (id, project_id, platform) VALUES ($1, $2, $3)"#,
 				id,
-				project.title,
-				project.description,
-				icon_url,
 				project.id.to_string(),
 				Platform::Modrinth as Platform
 			)
 				.execute(&*pool).await?;
 		}
 	}
+	
 	Ok(())
 }
