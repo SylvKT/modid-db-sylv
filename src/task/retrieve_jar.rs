@@ -162,6 +162,7 @@ pub async fn get_id_from_jar(project: Project, path: PathBuf) -> Result<(Project
 
 #[async_recursion]
 // cursed attempt to fix the EOCDR error
+// Don't ask why, but this works
 pub async fn attempt_get_id_from_jar(project: Project, path: PathBuf, attempt: u16) -> Result<(Project, String), JarError> {
 	let project_result = get_id_from_jar(project.clone(), path.clone()).await;
 	return if project_result.is_err() {
