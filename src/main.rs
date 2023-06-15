@@ -12,7 +12,7 @@ use ferinth::Ferinth;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
 use sqlx::postgres::PgPoolOptions;
-use crate::routes::{ApiError, v1};
+use crate::routes::{ApiError, v0};
 use crate::task::retrieve_jar::{get_fucking_jars, jar_loop};
 
 #[actix_web::main]
@@ -50,7 +50,7 @@ async fn main() {
 			.app_data(web::Data::new(pool_ref.clone()))
 			.app_data(web::Data::new(fer.clone()))
 			.service(default)
-			.configure(v1::config)
+			.configure(v0::config)
 	})
 		.bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000))
 		.expect("Failed to bind to address")

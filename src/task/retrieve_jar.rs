@@ -14,7 +14,7 @@ use sqlx::{PgPool, query, query_as};
 use time::OffsetDateTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::routes;
-use crate::routes::v1::mods::Platform;
+use crate::routes::v0::mods::Platform;
 
 const ALLOWED_LOADERS: &[&str; 2] = &["quilt", "fabric"];
 
@@ -257,7 +257,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	for (project, id) in projects {
 		// query database with project id
 		let mod_opt = query_as!(
-			routes::v1::mods::Mod,
+			routes::v0::mods::Mod,
 			r#"SELECT id, project_id, platform as "platform: _" FROM mods WHERE project_id = $1"#,
 			project.id.to_string()
 		)

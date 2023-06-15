@@ -3,7 +3,7 @@ use actix_web::http::StatusCode;
 use actix_web::{ResponseError};
 use crate::task::retrieve_jar::JarError;
 
-pub mod v1;
+pub mod v0;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
