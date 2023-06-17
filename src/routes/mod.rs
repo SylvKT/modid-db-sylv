@@ -9,6 +9,8 @@ pub mod v0;
 pub enum ApiError {
 	#[error("Database Error: {0}")]
 	Sqlx(#[from] sqlx::Error),
+	#[error("Ferinth Error: {0}")]
+	Ferinth(#[from] ferinth::Error),
 	#[error("{0}")]
 	JarError(#[from] JarError),
 	#[error("Other: {0}")]

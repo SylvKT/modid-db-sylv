@@ -7,16 +7,30 @@ use async_zip::base::read::seek::ZipFileReader;
 use ferinth::Ferinth;
 use ferinth::structures::{ID, Number};
 use ferinth::structures::project::{Project, ProjectType};
-use ferinth::structures::search::{Facet, Sort};
+use ferinth::structures::search::{Facet, Response, Sort};
 use ferinth::structures::version::{Version, VersionFile};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, query, query_as};
 use time::OffsetDateTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::routes;
+use crate::routes::ApiError;
 use crate::routes::v0::mods::Platform;
 
 const ALLOWED_LOADERS: &[&str; 2] = &["quilt", "fabric"];
+
+static FACETS: Lazy<Vec<&'static [Facet]>> = Lazy::new(|| {
+	let mut facets: Vec<Vec<Facet>> = vec![];
+	
+	for loader in ALLOWED_LOADERS {
+		facets.push(vec![Facet::Categories(String::from(*loader))]);
+	}
+	facets.push(vec![Facet::ProjectType(ProjectType::Mod)]);
+	// slice-ify it
+	let facets = facets.iter().map(|term| term.as_slice()).collect();
+	facets
+});
 
 #[derive(Debug, thiserror::Error)]
 /// An error triggered when
@@ -159,24 +173,8 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<String, JarError> {
 	Ok(id?)
 }
 
-pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
-	let mut facets: Vec<Vec<Facet>> = vec![];
-	
-	for loader in ALLOWED_LOADERS {
-		facets.push(vec![Facet::Categories(String::from(*loader))]);
-	}
-	facets.push(vec![Facet::ProjectType(ProjectType::Mod)]);
-	// slice-ify it
-	let facets: Vec<&[Facet]> = facets.iter().map(|term| term.as_slice()).collect();
-	
-	let fer = Ferinth::new("SylvKT@github.com/modid-db-sylv", None, Some("mailto:contact@sylv.gay") /* just in case they didn't get the memo */, None)?;
-	
-	// Request newest projects
-	let res = fer.search("", &Sort::Newest, facets.as_slice()).await?;
-	
-	// Request each project's latest .jar
-	let mut projects: Vec<(Project, String)> = vec![];
-	for hit in res.hits {
+pub async fn get_projects_and_ids(res: &Response, fer: &Ferinth, projects: &mut Vec<(Project, String)>) -> Result<(), JarError> {
+	for hit in res.hits.iter() {
 		let (project, path) = get_latest_jar(&fer, &hit.project_id).await?;
 		let project_result = get_id_from_jar(path).await;
 		
@@ -197,34 +195,28 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 		
 		projects.push((project, project_result.unwrap()));
 	}
+	Ok(())
+}
+
+pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
+	
+	let fer = Ferinth::new("SylvKT@github.com/modid-db-sylv", None, Some("mailto:contact@sylv.gay") /* just in case they didn't get the memo */, None)?;
+	
+	// Request each project's latest .jar
+	let mut projects: Vec<(Project, String)> = vec![];
+	
+	// Request newest projects
+	let res = fer.search("", &Sort::Newest, FACETS.as_slice()).await?;
+	
+	get_projects_and_ids(&res, &fer, &mut projects).await?;
 	
 	println!("Downloading top 30 newly updated mods.");
 	
 	// Request newly updated projects
-	let res = fer.search_paged("", &Sort::Updated, &Number::from(30usize), &Number::from(0usize), facets.as_slice()).await?;
+	let res = fer.search_paged("", &Sort::Updated, &Number::from(30usize), &Number::from(0usize), FACETS.as_slice()).await?;
 	
 	// second chance
-	for hit in res.hits {
-		let (project, path) = get_latest_jar(&fer, &hit.project_id).await?;
-		let project_result = get_id_from_jar(path).await;
-		
-		if project_result.is_err() {
-			// check if this is a compat or EOCDR error
-			let err = project_result.err().unwrap();
-			if match err {
-				JarError::CompatError(_) => true,
-				JarError::ZipError(async_zip::error::ZipError::UnableToLocateEOCDR) => true,
-				_ => false,
-			} { // skip this project
-				eprintln!("{}", err);
-				continue;
-			} else { // this is a normal error; return it
-				return Err(err)
-			}
-		}
-		
-		projects.push((project, project_result.unwrap()));
-	}
+	get_projects_and_ids(&res, &fer, &mut projects).await?;
 	
 	for (project, id) in projects {
 		// query database with project id
