@@ -10,7 +10,7 @@ use ferinth::structures::search::Sort;
 use serde::{Serialize, Deserialize};
 use sqlx::{PgPool};
 use crate::routes::ApiError;
-use crate::task::retrieve_jar::{default_facets, get_id_from_jar, get_latest_jar, get_projects_and_ids};
+use crate::task::retrieve_jar::{FACETS, get_id_from_jar, get_latest_jar, get_projects_and_ids};
 
 pub fn config(cfg: &mut ServiceConfig) {
 	cfg.service(
@@ -175,8 +175,7 @@ async fn get_from_id(
 	
 	if mods.is_empty() { // search in the modrinth query
 		let max_results = 5usize;
-		let facets = default_facets();
-		let res = fer.search_paged(&*query.id, &Sort::Relevance, &Number::from(max_results), &Number::from(0usize), facets.as_ref()).await?;
+		let res = fer.search_paged(&*query.id, &Sort::Relevance, &Number::from(max_results), &Number::from(0usize), FACETS.as_ref()).await?;
 		let mut projects = vec![];
 		get_projects_and_ids(&res, &fer, &mut projects).await?;
 		for proj_id in projects {

@@ -2,7 +2,6 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use async_recursion::async_recursion;
 use async_zip::base::read::seek::ZipFileReader;
 use ferinth::Ferinth;
 use ferinth::structures::{ID, Number};
@@ -20,7 +19,7 @@ use crate::routes::v0::mods::Platform;
 
 const ALLOWED_LOADERS: &[&str; 2] = &["quilt", "fabric"];
 
-static FACETS: Lazy<Vec<&'static [Facet]>> = Lazy::new(|| {
+pub static FACETS: Lazy<Vec<&'static [Facet]>> = Lazy::new(|| {
 	let mut facets: Vec<Vec<Facet>> = vec![];
 	
 	for loader in ALLOWED_LOADERS {
@@ -28,8 +27,8 @@ static FACETS: Lazy<Vec<&'static [Facet]>> = Lazy::new(|| {
 	}
 	facets.push(vec![Facet::ProjectType(ProjectType::Mod)]);
 	// slice-ify it
-	let facets = facets.iter().map(|term| term.as_slice()).collect();
-	facets
+	let facets: Vec<&'static [Facet]> = facets.iter().map(|term| term.as_slice().to_owned()).collect();
+	facets.to_owned()
 });
 
 #[derive(Debug, thiserror::Error)]

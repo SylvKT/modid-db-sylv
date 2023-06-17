@@ -21,6 +21,7 @@ impl ResponseError for ApiError {
 	fn status_code(&self) -> StatusCode {
 		match self {
 			ApiError::Sqlx(..) => StatusCode::INTERNAL_SERVER_ERROR,
+			ApiError::Ferinth(..) => StatusCode::INTERNAL_SERVER_ERROR,
 			ApiError::JarError(..) => StatusCode::INTERNAL_SERVER_ERROR,
 			ApiError::Other(..) => StatusCode::INTERNAL_SERVER_ERROR,
 		}
