@@ -75,7 +75,7 @@ pub async fn download_file_from_ver(ver: Version) -> Result<PathBuf, JarError> {
 	let mut file = tokio::fs::File::create(&ver_file.filename).await?;
 	let bytes = res.bytes().await?;
 	let buf: Vec<u8> = bytes.to_vec();
-	file.write(buf.as_slice()).await?;
+	file.write_all(buf.as_slice()).await?;
 	Ok(Path::new(ver_file.filename.as_str()).to_path_buf())
 }
 
@@ -159,36 +159,6 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<String, JarError> {
 	Ok(id?)
 }
 
-#[async_recursion]
-// cursed attempt to fix the EOCDR error
-// Don't ask why, but this works
-pub async fn attempt_get_id_from_jar(path: PathBuf, attempt: u16) -> Result<String, JarError> {
-	let project_result = get_id_from_jar(path.clone()).await;
-	return if project_result.is_err() {
-		// check if this is a compat or EOCDR error
-		let err = project_result.err().unwrap();
-		return if match err {
-			JarError::CompatError(_) => true,
-			JarError::ZipError(async_zip::error::ZipError::UnableToLocateEOCDR) => true,
-			_ => false,
-		} { // attempt again
-			eprintln!("{}", err);
-			eprintln!("Attempt #{}", attempt);
-			if attempt > 1 {
-				tokio::time::sleep(Duration::from_secs(1)).await;
-				attempt_get_id_from_jar(path, attempt - 1).await
-			} else {
-				// tokio::fs::remove_file(&*path).await?;
-				Err(err)
-			}
-		} else { // this is a normal error; return it
-			Err(err)
-		}
-	} else {
-		project_result
-	}
-}
-
 pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	let mut facets: Vec<Vec<Facet>> = vec![];
 	
@@ -208,7 +178,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	let mut projects: Vec<(Project, String)> = vec![];
 	for hit in res.hits {
 		let (project, path) = get_latest_jar(&fer, &hit.project_id).await?;
-		let project_result = attempt_get_id_from_jar(path, 5).await;
+		let project_result = get_id_from_jar(path).await;
 		
 		if project_result.is_err() {
 			// check if this is a compat or EOCDR error
@@ -234,7 +204,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	// second chance
 	for hit in res.hits {
 		let (project, path) = get_latest_jar(&fer, &hit.project_id).await?;
-		let project_result = attempt_get_id_from_jar(path, 5).await;
+		let project_result = get_id_from_jar(path).await;
 		
 		if project_result.is_err() {
 			// check if this is a compat or EOCDR error
