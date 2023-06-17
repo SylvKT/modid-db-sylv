@@ -198,6 +198,8 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 		projects.push((project, project_result.unwrap()));
 	}
 	
+	println!("Downloading top 30 newly updated mods.");
+	
 	// Request newly updated projects
 	let res = fer.search_paged("", &Sort::Updated, &Number::from(30usize), &Number::from(0usize), facets.as_slice()).await?;
 	
