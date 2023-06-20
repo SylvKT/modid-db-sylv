@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::Write;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use async_zip::base::read::seek::ZipFileReader;
@@ -19,16 +20,14 @@ use crate::routes::v0::mods::Platform;
 
 const ALLOWED_LOADERS: &[&str; 2] = &["quilt", "fabric"];
 
-pub static FACETS: Lazy<Vec<&'static [Facet]>> = Lazy::new(|| {
+pub static FACETS: Lazy<Vec<Vec<Facet>>> = Lazy::new(|| {
 	let mut facets: Vec<Vec<Facet>> = vec![];
 	
 	for loader in ALLOWED_LOADERS {
 		facets.push(vec![Facet::Categories(String::from(*loader))]);
 	}
 	facets.push(vec![Facet::ProjectType(ProjectType::Mod)]);
-	// slice-ify it
-	let facets: Vec<&'static [Facet]> = facets.iter().map(|term| term.as_slice().to_owned()).collect();
-	facets.to_owned()
+	facets
 });
 
 #[derive(Debug, thiserror::Error)]
@@ -198,6 +197,8 @@ pub async fn get_projects_and_ids(res: &Response, fer: &Ferinth, projects: &mut 
 }
 
 pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
+	// slice-ify facets
+	let facets: Vec<&[Facet]> = FACETS.iter().map(|term| term.as_slice()).collect();
 	
 	let fer = Ferinth::new("SylvKT@github.com/modid-db-sylv", None, Some("mailto:contact@sylv.gay") /* just in case they didn't get the memo */, None)?;
 	
@@ -205,14 +206,14 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	let mut projects: Vec<(Project, String)> = vec![];
 	
 	// Request newest projects
-	let res = fer.search("", &Sort::Newest, FACETS.as_slice()).await?;
+	let res = fer.search("", &Sort::Newest, facets.as_slice()).await?;
 	
 	get_projects_and_ids(&res, &fer, &mut projects).await?;
 	
 	println!("Downloading top 30 newly updated mods.");
 	
 	// Request newly updated projects
-	let res = fer.search_paged("", &Sort::Updated, &Number::from(30usize), &Number::from(0usize), FACETS.as_slice()).await?;
+	let res = fer.search_paged("", &Sort::Updated, &Number::from(30usize), &Number::from(0usize), facets.as_slice()).await?;
 	
 	// second chance
 	get_projects_and_ids(&res, &fer, &mut projects).await?;

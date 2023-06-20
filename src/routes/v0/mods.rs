@@ -6,7 +6,7 @@ use actix_web::web::ServiceConfig;
 use ferinth::Ferinth;
 use ferinth::structures::{ID, Number};
 use ferinth::structures::project::Project;
-use ferinth::structures::search::Sort;
+use ferinth::structures::search::{Facet, Sort};
 use serde::{Serialize, Deserialize};
 use sqlx::{PgPool};
 use crate::routes::ApiError;
@@ -175,7 +175,8 @@ async fn get_from_id(
 	
 	if mods.is_empty() { // search in the modrinth query
 		let max_results = 5usize;
-		let res = fer.search_paged(&*query.id, &Sort::Relevance, &Number::from(max_results), &Number::from(0usize), FACETS.as_ref()).await?;
+		let facets: Vec<&[Facet]> = FACETS.iter().map(|term| term.as_slice()).collect();
+		let res = fer.search_paged(&*query.id, &Sort::Relevance, &Number::from(max_results), &Number::from(0usize), facets.as_slice()).await?;
 		let mut projects = vec![];
 		get_projects_and_ids(&res, &fer, &mut projects).await?;
 		for proj_id in projects {
