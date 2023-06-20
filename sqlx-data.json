@@ -1,0 +1,162 @@
+{
+  "db": "PostgreSQL",
+  "15c7f5d1eff73017725f418ba95f5ef9e747f9169b5ef8d89f83699d26cae752": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "project_id",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "platform: _",
+          "ordinal": 2,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "modrinth"
+                ]
+              },
+              "name": "platform"
+            }
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT id, project_id, platform as \"platform: _\" FROM mods WHERE project_id = $1;"
+  },
+  "9ab2351551cdf4fc539360f598452dbd059d64caaa7e2d7035db457020e06d36": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE mods SET id = $1 WHERE project_id = $2"
+  },
+  "a0401e75266a2af907cf3477ae525cd949bee602dd44dc9f9c994b7f80d8dab0": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "project_id",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "platform: _",
+          "ordinal": 2,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "modrinth"
+                ]
+              },
+              "name": "platform"
+            }
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT id, project_id, platform as \"platform: _\" FROM mods WHERE project_id = $1"
+  },
+  "b806212186027f29029c472f4a62ea73c4effb8e04a32ea25575ec9e6b51b2da": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "modrinth"
+                ]
+              },
+              "name": "platform"
+            }
+          }
+        ]
+      }
+    },
+    "query": "INSERT INTO mods (id, project_id, platform) VALUES ($1, $2, $3)"
+  },
+  "fb14705b2dfe24555a88fa7ed9d7ba9a953332934d3ad39a2747723264ecc9ce": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "project_id",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "platform: _",
+          "ordinal": 2,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "modrinth"
+                ]
+              },
+              "name": "platform"
+            }
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT id, project_id, platform as \"platform: _\" FROM mods WHERE id = $1;"
+  }
+}
