@@ -52,7 +52,7 @@ async fn main() {
 			.service(default)
 			.configure(v0::config)
 	})
-		.bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 443))
+		.bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 443))
 		.expect("Failed to bind to address")
 		.run()
 		.await;
