@@ -4,16 +4,19 @@ mod test;
 mod task;
 mod routes;
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::thread;
+use std::fs::File;
+use std::io::BufReader;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 use actix_web::{App, get, HttpResponse, HttpServer, web};
 use ferinth::Ferinth;
+use rustls_pemfile::{certs, pkcs8_private_keys};
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Postgres};
 use sqlx::postgres::PgPoolOptions;
 use crate::routes::{ApiError, v0};
-use crate::task::retrieve_jar::{get_fucking_jars, jar_loop};
+use crate::task::retrieve_jar::jar_loop;
+
+static USE_TLS: bool = true;
 
 #[actix_web::main]
 async fn main() {
@@ -51,16 +54,59 @@ async fn main() {
 			.app_data(web::Data::new(fer.clone()))
 			.service(default)
 			.configure(v0::config)
-	})
-		.bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 443))
-		.expect("Failed to bind to address")
-		.run()
-		.await;
+	});
+	
+	if USE_TLS {
+		let certs = load_certs()
+			.expect("Failed to load certificates");
+		
+		server
+			.bind_rustls(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 443), certs.clone())
+			.expect("Failed to bind to IPv4 address on port 443")
+			.bind_rustls(SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 443), certs.clone())
+			.expect("Failed to bind to IPv6 address on port 443")
+			.run()
+			.await
+			.expect("Server panicked");
+	} else {
+		server
+			.bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 80))
+			.expect("Failed to bind to IPv4 address on port 80")
+			.bind(SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 80))
+			.expect("Failed to bind to IPv6 address on port 80")
+			.run()
+			.await
+			.expect("Server panicked");
+	}
 	
 	handle
 		.await
 		.expect("Blocking jar retrieval task panicked")
 		.await;
+}
+
+fn load_certs() -> Result<rustls::ServerConfig, ApiError> {
+	let cert_file = &mut BufReader::new(File::open("cert.pem")?);
+	let key_file = &mut BufReader::new(File::open("key.pem")?);
+	
+	let cert_chain = certs(cert_file)?
+		.into_iter()
+		.map(rustls::Certificate)
+		.collect();
+	let mut keys: Vec<rustls::PrivateKey> = pkcs8_private_keys(key_file)?
+		.into_iter()
+		.map(rustls::PrivateKey)
+		.collect();
+	
+	// exit if couldn't parse keys
+	if keys.is_empty() {
+		return Err(ApiError::Other("Failed to locate PKCS 8 private keys".to_string()))
+	}
+	
+	let config = rustls::ServerConfig::builder()
+		.with_safe_defaults()
+		.with_no_client_auth();
+	Ok(config.with_single_cert(cert_chain, keys.remove(0))?)
 }
 
 // not copied from Labrinth i swear

@@ -13,6 +13,10 @@ pub enum ApiError {
 	Ferinth(#[from] ferinth::Error),
 	#[error("{0}")]
 	JarError(#[from] JarError),
+	#[error("I/O Error: {0}")]
+	Io(#[from] std::io::Error),
+	#[error("RusTLS Error: {0}")]
+	RusTLS(#[from] rustls::Error),
 	#[error("Other: {0}")]
 	Other(String),
 }
@@ -20,9 +24,11 @@ pub enum ApiError {
 impl ResponseError for ApiError {
 	fn status_code(&self) -> StatusCode {
 		match self {
-			ApiError::Sqlx(..) => StatusCode::INTERNAL_SERVER_ERROR,
+			ApiError::Sqlx(..) => StatusCode::BAD_GATEWAY,
 			ApiError::Ferinth(..) => StatusCode::INTERNAL_SERVER_ERROR,
 			ApiError::JarError(..) => StatusCode::INTERNAL_SERVER_ERROR,
+			ApiError::Io(..) => StatusCode::INTERNAL_SERVER_ERROR,
+			ApiError::RusTLS(..) => StatusCode::INTERNAL_SERVER_ERROR,
 			ApiError::Other(..) => StatusCode::INTERNAL_SERVER_ERROR,
 		}
 	}

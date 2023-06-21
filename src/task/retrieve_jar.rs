@@ -1,6 +1,3 @@
-use std::fs::File;
-use std::io::Write;
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use async_zip::base::read::seek::ZipFileReader;
@@ -10,12 +7,11 @@ use ferinth::structures::project::{Project, ProjectType};
 use ferinth::structures::search::{Facet, Response, Sort};
 use ferinth::structures::version::{Version, VersionFile};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::{PgPool, query, query_as};
 use time::OffsetDateTime;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use crate::routes;
-use crate::routes::ApiError;
 use crate::routes::v0::mods::Platform;
 
 const ALLOWED_LOADERS: &[&str; 2] = &["quilt", "fabric"];
