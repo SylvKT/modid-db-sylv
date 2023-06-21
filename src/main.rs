@@ -62,18 +62,14 @@ async fn main() {
 		
 		server
 			.bind_rustls(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 443), certs.clone())
-			.expect("Failed to bind to IPv4 address on port 443")
-			.bind_rustls(SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 443), certs.clone())
-			.expect("Failed to bind to IPv6 address on port 443")
+			.expect("Failed to bind to address 0.0.0.0 on port 443")
 			.run()
 			.await
 			.expect("Server panicked");
 	} else {
 		server
 			.bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 80))
-			.expect("Failed to bind to IPv4 address on port 80")
-			.bind(SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 80))
-			.expect("Failed to bind to IPv6 address on port 80")
+			.expect("Failed to bind to address 0.0.0.0 on port 80")
 			.run()
 			.await
 			.expect("Server panicked");
