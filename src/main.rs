@@ -61,6 +61,8 @@ async fn main() {
 			.expect("Failed to load certificates");
 		
 		server
+			.bind_rustls(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 80), certs.clone())
+			.expect("Failed to bind to address 0.0.0.0 on port 80")
 			.bind_rustls(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 443), certs.clone())
 			.expect("Failed to bind to address 0.0.0.0 on port 443")
 			.run()
