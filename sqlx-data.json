@@ -41,6 +41,45 @@
     },
     "query": "SELECT id, project_id, platform as \"platform: _\" FROM mods WHERE project_id = $1;"
   },
+  "393d00d490dd911fc76893a2eb42fb373fe6f5224a5bae2e4e5343061c39ab94": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Timestamptz"
+        ]
+      }
+    },
+    "query": "INSERT INTO recent_searches (id, \"time\") VALUES ($1, $2)"
+  },
+  "4e1b6f9a42482acbf02b251812ac19cc835f2a80dfa1ca8643ce4ed8f18f71cd": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "time",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT id, \"time\" FROM recent_searches WHERE id = $1"
+  },
   "9ab2351551cdf4fc539360f598452dbd059d64caaa7e2d7035db457020e06d36": {
     "describe": {
       "columns": [],
@@ -94,6 +133,19 @@
       }
     },
     "query": "SELECT id, project_id, platform as \"platform: _\" FROM mods WHERE project_id = $1"
+  },
+  "b319e122d875f76c0a198761b738adfbcc98cedc75eff511096eb546de28600f": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE recent_searches SET \"time\" = $1 WHERE id = $2"
   },
   "b806212186027f29029c472f4a62ea73c4effb8e04a32ea25575ec9e6b51b2da": {
     "describe": {
