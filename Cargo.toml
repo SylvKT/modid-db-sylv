@@ -25,3 +25,4 @@ async_zip = { version = "0.0.15", features = ["full"] }
 once_cell = "1"
 rustls = "0.20.8" # keep this the same version as actix-web uses
 rustls-pemfile = "1"
+actix-web-middleware-redirect-scheme = { git = "https://github.com/AOx0/actix-web-middleware-redirect-scheme.git", branch = "master" }
