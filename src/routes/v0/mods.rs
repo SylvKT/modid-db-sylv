@@ -9,8 +9,13 @@ use ferinth::structures::project::Project;
 use ferinth::structures::search::{Facet, Sort};
 use serde::{Serialize, Deserialize};
 use sqlx::{PgPool};
+use sqlx::postgres::types::PgTimeTz;
+use time::OffsetDateTime;
 use crate::routes::ApiError;
 use crate::task::retrieve_jar::{FACETS, get_id_from_jar, get_latest_jar, get_projects_and_ids};
+
+/// The search cooldown in seconds for any ID
+const SEARCH_COOLDOWN: i64 = 2 * 60;
 
 pub fn config(cfg: &mut ServiceConfig) {
 	cfg.service(
@@ -116,8 +121,13 @@ struct IdQuery {
 	pub id: String,
 }
 
+struct RecentSearch {
+	pub id: String,
+	pub time: OffsetDateTime,
+}
+
 /// This queries the database for the given project ID and either adds it or updates it depending on if it exists
-async fn set_or_update_mod(project: &Project, id: String, pool: &PgPool) -> Result<HttpResponse, ApiError> {
+async fn set_or_update_mod(project: &Project, id: String, pool: &PgPool) -> Result<Mod, ApiError> {
 	if id.len() == 0 {
 		return Err(ApiError::Other("Failed to extract mod ID".to_string()))
 	}
@@ -127,7 +137,7 @@ async fn set_or_update_mod(project: &Project, id: String, pool: &PgPool) -> Resu
 				r#"SELECT id, project_id, platform as "platform: _" FROM mods WHERE project_id = $1"#,
 				project.id.to_string()
 			)
-		.fetch_optional(&*pool).await?;
+		.fetch_optional(pool).await?;
 	if let Some(r#mod) = mod_opt { // if the mod exists in the database
 		if r#mod.id != id { // if this mod ID is new (doesn't match)
 			// update the mod ID
@@ -136,7 +146,7 @@ async fn set_or_update_mod(project: &Project, id: String, pool: &PgPool) -> Resu
 						id,
 						project.id.to_string()
 					)
-				.execute(&*pool).await?;
+				.execute(pool).await?;
 		}
 	} else {
 		// add mod to database
@@ -146,7 +156,7 @@ async fn set_or_update_mod(project: &Project, id: String, pool: &PgPool) -> Resu
 					project.id.to_string(),
 					Platform::Modrinth as Platform
 				)
-			.execute(&*pool).await?;
+			.execute(pool).await?;
 	}
 	
 	let r#mod = Mod {
@@ -154,9 +164,52 @@ async fn set_or_update_mod(project: &Project, id: String, pool: &PgPool) -> Resu
 		project_id: project.id.clone(),
 		platform: Platform::Modrinth,
 	};
-	let res = HttpResponse::Ok()
-		.json(r#mod);
-	Ok(res)
+	Ok(r#mod)
+}
+
+/// This function checks if the cooldown for a particular mod ID has been reached.
+async fn can_search_mod(id: &str, pool: &PgPool) -> Result<bool, ApiError> {
+	// check the database for a recent search with the given ID
+	let recent_search = sqlx::query_as!(
+		RecentSearch,
+		r#"SELECT id, "time" FROM recent_searches WHERE id = $1"#,
+		id,
+	)
+		.fetch_optional(&*pool)
+		.await?;
+	if let Some(recent_search) = recent_search {
+		return if OffsetDateTime::now_utc().unix_timestamp() > recent_search.time.unix_timestamp() + SEARCH_COOLDOWN { // if the current time is greater than the time of last search plus the cooldown
+			Ok(true)
+		} else {
+			Ok(false)
+		}
+	}
+	Ok(false)
+}
+
+/// Resets the search cooldown of a mod ID
+async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiError> {
+	let query = sqlx::query!(
+		r#"UPDATE recent_searches SET "time" = $1 WHERE id = $2"#,
+		OffsetDateTime::now_utc(),
+		id,
+	)
+		.execute(pool)
+		.await;
+	if let Some(err) = query.err() {
+		if match err {
+			sqlx::error::Error::RowNotFound => true,
+			_ => false,
+		} {
+			sqlx::query!(
+				r#"INSERT INTO recent_searches (id, "time") VALUES ($1, $2)"#,
+				id,
+				OffsetDateTime::now_utc(),
+			)
+				.execute(pool).await?;
+		}
+	}
+	Ok(())
 }
 
 #[get("/get")]
@@ -165,7 +218,7 @@ async fn get_from_id(
 	pool: web::Data<PgPool>,
 	fer: web::Data<Ferinth>,
 ) -> Result<HttpResponse, ApiError> {
-	let mods = sqlx::query_as!(
+	let mut mods = sqlx::query_as!(
 		Mod,
 		r#"SELECT id, project_id, platform as "platform: _" FROM mods WHERE id = $1;"#,
 		query.id,
@@ -173,17 +226,21 @@ async fn get_from_id(
 		.fetch_all(&**pool)
 		.await?;
 	
-	if mods.is_empty() { // search in the modrinth query
-		let max_results = 5usize;
+	if can_search_mod(&*query.id, &pool).await? { // check if we just searched for new mods
+		// reset our ID search cooldown
+		reset_id_search_cooldown(&*query.id, &pool).await?;
+		// search in the modrinth query
+		let max_results = 10usize;
 		let facets: Vec<&[Facet]> = FACETS.iter().map(|term| term.as_slice()).collect();
 		let res = fer.search_paged(&*query.id, &Sort::Relevance, &Number::from(max_results), &Number::from(0usize), facets.as_slice()).await?;
 		let mut projects = vec![];
 		get_projects_and_ids(&res, &fer, &mut projects).await?;
 		for proj_id in projects {
-			if proj_id.1 == query.id {
+			if proj_id.1 == query.id { // if the mod id is in the query
+				// add the mod to the response
 				let project = proj_id.0;
 				let id = proj_id.1;
-				return set_or_update_mod(&project, id, pool.get_ref()).await
+				mods.push(set_or_update_mod(&project, id, pool.get_ref()).await?);
 			}
 		}
 	}
@@ -214,7 +271,10 @@ async fn get_from_project_id(
 		} { // download mod and add id to database
 			let (project, path) = get_latest_jar(fer.as_ref(), &*path).await?;
 			let id = get_id_from_jar(path).await?;
-			set_or_update_mod(&project, id, pool.get_ref()).await
+			let r#mod = set_or_update_mod(&project, id, pool.get_ref()).await;
+			let res = HttpResponse::Ok()
+				.json(r#mod?);
+			Ok(res)
 		} else {
 			Err(ApiError::from(err))
 		}
