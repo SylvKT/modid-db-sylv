@@ -177,6 +177,7 @@ async fn can_search_mod(id: &str, pool: &PgPool) -> Result<bool, ApiError> {
 	)
 		.fetch_optional(&*pool)
 		.await?;
+	println!("Checking if we can search for the mod ID {}", id.to_string());
 	if let Some(recent_search) = recent_search {
 		return if OffsetDateTime::now_utc().unix_timestamp() > recent_search.time.unix_timestamp() + SEARCH_COOLDOWN { // if the current time is greater than the time of last search plus the cooldown
 			Ok(true)
@@ -227,6 +228,7 @@ async fn get_from_id(
 		.await?;
 	
 	if can_search_mod(&*query.id, &pool).await? { // check if we just searched for new mods
+		println!("We can search for the mod");
 		// reset our ID search cooldown
 		reset_id_search_cooldown(&*query.id, &pool).await?;
 		// search in the modrinth query
