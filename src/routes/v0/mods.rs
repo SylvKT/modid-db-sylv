@@ -200,10 +200,12 @@ async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiErro
 		.await;
 	println!("Attempt 1");
 	if let Some(err) = query.err() {
+		println!("Error found");
 		if match err {
 			sqlx::error::Error::RowNotFound => true,
 			_ => false,
 		} {
+			println!("Starting Attempt 2");
 			sqlx::query!(
 				r#"INSERT INTO recent_searches (id, "time") VALUES ($1, $2)"#,
 				id,
