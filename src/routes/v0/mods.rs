@@ -208,6 +208,8 @@ async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiErro
 				OffsetDateTime::now_utc(),
 			)
 				.execute(pool).await?;
+		} else {
+			eprintln!("{}", err.to_string());
 		}
 	}
 	Ok(())
