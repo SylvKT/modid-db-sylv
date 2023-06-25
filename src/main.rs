@@ -66,6 +66,8 @@ async fn main() {
 		server
 			.bind_rustls(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 443), certs)
 			.expect("Failed to bind to address 0.0.0.0 on port 443")
+			.bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 80))
+			.expect("Failed to bind to address 0.0.0.0 on port 80")
 			.run()
 			.await
 			.expect("Server panicked");
