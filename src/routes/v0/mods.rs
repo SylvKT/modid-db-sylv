@@ -177,7 +177,6 @@ async fn can_search_mod(id: &str, pool: &PgPool) -> Result<bool, ApiError> {
 	)
 		.fetch_optional(&*pool)
 		.await?;
-	println!("Checking if we can search for the mod ID {}", id.to_string());
 	if let Some(recent_search) = recent_search {
 		return if OffsetDateTime::now_utc().unix_timestamp() > recent_search.time.unix_timestamp() + SEARCH_COOLDOWN { // if the current time is greater than the time of last search plus the cooldown
 			Ok(true)
@@ -190,33 +189,34 @@ async fn can_search_mod(id: &str, pool: &PgPool) -> Result<bool, ApiError> {
 
 /// Resets the search cooldown of a mod ID
 async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiError> {
-	println!("Resetting ID");
+	// sanity check
 	let query = sqlx::query!(
-		r#"UPDATE recent_searches SET "time" = $1 WHERE id = $2"#,
-		OffsetDateTime::now_utc(),
+		r#"SELECT id FROM recent_searches WHERE id = $1"#,
 		id,
 	)
-		.execute(pool)
-		.await;
-	println!("Attempt 1");
-	if let Some(err) = query.err() {
-		println!("Error found");
-		if match err {
-			sqlx::error::Error::RowNotFound => true,
-			_ => false,
-		} {
-			println!("Starting Attempt 2");
-			sqlx::query!(
-				r#"INSERT INTO recent_searches (id, "time") VALUES ($1, $2)"#,
-				id,
-				OffsetDateTime::now_utc(),
-			)
-				.execute(pool).await?;
-			println!("Attempt 2");
-		} else {
-			println!("{}", err.to_string());
-		}
+		.fetch_optional(pool)
+		.await?;
+	
+	// check if it already exists
+	if query.is_some() {
+		// update it
+		sqlx::query!(
+			r#"UPDATE recent_searches SET "time" = $1 WHERE id = $2"#,
+			OffsetDateTime::now_utc(),
+			id,
+		)
+			.execute(pool)
+			.await?;
+	} else {
+		// create it
+		sqlx::query!(
+			r#"INSERT INTO recent_searches (id, "time") VALUES ($1, $2)"#,
+			id,
+			OffsetDateTime::now_utc(),
+		)
+			.execute(pool).await?;
 	}
+	
 	Ok(())
 }
 
@@ -235,10 +235,8 @@ async fn get_from_id(
 		.await?;
 	
 	if can_search_mod(&*query.id, &pool).await? { // check if we just searched for new mods
-		println!("We can search for the mod");
 		// reset our ID search cooldown
 		reset_id_search_cooldown(&*query.id, &pool).await?;
-		println!("After reset ID search cooldown");
 		// search in the modrinth query
 		let max_results = 10usize;
 		let facets: Vec<&[Facet]> = FACETS.iter().map(|term| term.as_slice()).collect();
@@ -248,11 +246,15 @@ async fn get_from_id(
 		get_projects_and_ids(&res, &fer, &mut projects).await?;
 		println!("Looping through projects");
 		for proj_id in projects {
+			println!("Found mod with ID {}", proj_id.1);
+			// add mod to database
+			let project = proj_id.0;
+			let id = proj_id.1;
+			let r#mod = set_or_update_mod(&project, id, pool.get_ref()).await?;
+			
 			if proj_id.1 == query.id { // if the mod id is in the query
 				// add the mod to the response
-				let project = proj_id.0;
-				let id = proj_id.1;
-				mods.push(set_or_update_mod(&project, id, pool.get_ref()).await?);
+				mods.push(r#mod);
 			}
 		}
 	}

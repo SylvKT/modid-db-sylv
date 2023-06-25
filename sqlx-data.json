@@ -80,6 +80,26 @@
     },
     "query": "SELECT id, \"time\" FROM recent_searches WHERE id = $1"
   },
+  "798a049a8238530f5d830a7b366bb6a72e134d1b7a9022ed4285ef18aff609af": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT id FROM recent_searches WHERE id = $1"
+  },
   "9ab2351551cdf4fc539360f598452dbd059d64caaa7e2d7035db457020e06d36": {
     "describe": {
       "columns": [],
