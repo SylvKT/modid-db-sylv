@@ -190,6 +190,7 @@ async fn can_search_mod(id: &str, pool: &PgPool) -> Result<bool, ApiError> {
 
 /// Resets the search cooldown of a mod ID
 async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiError> {
+	println!("Resetting ID");
 	let query = sqlx::query!(
 		r#"UPDATE recent_searches SET "time" = $1 WHERE id = $2"#,
 		OffsetDateTime::now_utc(),
@@ -197,6 +198,7 @@ async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiErro
 	)
 		.execute(pool)
 		.await;
+	println!("Attempt 1");
 	if let Some(err) = query.err() {
 		if match err {
 			sqlx::error::Error::RowNotFound => true,
@@ -208,6 +210,7 @@ async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiErro
 				OffsetDateTime::now_utc(),
 			)
 				.execute(pool).await?;
+			println!("Attempt 2");
 		} else {
 			eprintln!("{}", err.to_string());
 		}
