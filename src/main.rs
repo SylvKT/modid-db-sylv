@@ -9,6 +9,7 @@ use std::io::BufReader;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 use actix_web::{App, get, HttpResponse, HttpServer, web};
+use actix_web_lab::header::StrictTransportSecurity;
 use actix_web_lab::middleware::RedirectHttps;
 use ferinth::Ferinth;
 use rustls_pemfile::{certs, pkcs8_private_keys};
@@ -51,7 +52,7 @@ async fn main() {
 	// Start actix server
 	let server = HttpServer::new(move || {
 		App::new()
-			.wrap(RedirectHttps::default())
+			.wrap(RedirectHttps::default().to_port(443))
 			.app_data(web::Data::new(pool_ref.clone()))
 			.app_data(web::Data::new(fer.clone()))
 			.service(default)
