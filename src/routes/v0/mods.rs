@@ -1,16 +1,16 @@
 // maybe naming this "mods" was a bad idea 😅
 
-use actix_web::{get, HttpRequest, HttpResponse, web};
+use actix_web::{get, HttpResponse, web};
 use actix_web::http::StatusCode;
 use actix_web::web::ServiceConfig;
 use ferinth::Ferinth;
 use ferinth::structures::{ID, Number};
 use ferinth::structures::project::Project;
 use ferinth::structures::search::{Facet, Sort};
-use serde::{Serialize, Deserialize};
-use sqlx::{PgPool};
-use sqlx::postgres::types::PgTimeTz;
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use time::OffsetDateTime;
+
 use crate::routes::ApiError;
 use crate::task::retrieve_jar::{FACETS, get_id_from_jar, get_latest_jar, get_projects_and_ids};
 
@@ -28,14 +28,20 @@ pub fn config(cfg: &mut ServiceConfig) {
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "platform", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
+/// The modding platform on which a mod resides (e.g. Modrinth or CurseForge)<br>
+/// *Note: CurseForge is unsupported.*
 pub enum Platform {
 	Modrinth,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// A mod in the database.
 pub struct Mod {
+	/// The mod's mod loader ID.
 	pub id: String,
+	/// The project ID in the format of the given platform.
 	pub project_id: String,
+	/// The platform on which this mod resides.
 	pub platform: Platform,
 }
 
@@ -118,11 +124,15 @@ impl ::sqlx::Type<sqlx::Postgres> for Mod {
 // END TOMFUCKERY
 
 #[derive(Debug, Serialize, Deserialize)]
+/// The mod ID in a URL query.
 struct IdQuery {
 	pub id: String,
 }
 
+#[derive(Debug)]
+/// A recent search in the `recent_searches` table.
 struct RecentSearch {
+	#[allow(dead_code)]
 	pub id: String,
 	pub time: OffsetDateTime,
 }

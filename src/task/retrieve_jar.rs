@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+
 use async_zip::base::read::seek::ZipFileReader;
 use ferinth::Ferinth;
 use ferinth::structures::{ID, Number};
@@ -11,6 +12,8 @@ use serde::Deserialize;
 use sqlx::{PgPool, query, query_as};
 use time::OffsetDateTime;
 use tokio::io::AsyncWriteExt;
+
+use crate::error::VariantName;
 use crate::routes;
 use crate::routes::v0::mods::Platform;
 
@@ -29,20 +32,33 @@ pub static FACETS: Lazy<Vec<Vec<Facet>>> = Lazy::new(|| {
 });
 
 #[derive(Debug, thiserror::Error)]
-/// An error triggered when
+/// An error triggered when handling .jar files.
 pub enum JarError {
 	#[error("Zip Error: {0}")]
-	ZipError(#[from] async_zip::error::ZipError),
+	Zip(#[from] async_zip::error::ZipError),
 	#[error("I/O Error: {0}")]
-	IoError(#[from] std::io::Error),
+	Io(#[from] std::io::Error),
 	#[error("HTTP Request Error: {0}")]
-	HttpError(#[from] reqwest::Error),
+	Http(#[from] reqwest::Error),
 	#[error("Ferinth Error: {0}")]
-	FerinthError(#[from] ferinth::Error),
+	Ferinth(#[from] ferinth::Error),
 	#[error("SQL Database Error: {0}")]
-	SqlError(#[from] sqlx::Error),
+	Sqlx(#[from] sqlx::Error),
 	#[error("Compatibility Error: {0}")]
-	CompatError(#[from] CompatError),
+	Compat(#[from] CompatError),
+}
+
+impl VariantName for JarError {
+	fn variant_name(&self) -> &'static str {
+		match self {
+			JarError::Zip(..) => "zip",
+			JarError::Io(..) => "io",
+			JarError::Http(..) => "http",
+			JarError::Ferinth(..) => "ferinth",
+			JarError::Sqlx(..) => "sqlx",
+			JarError::Compat(..) => "compat",
+		}
+	}
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -178,8 +194,8 @@ pub async fn get_projects_and_ids(res: &Response, fer: &Ferinth, projects: &mut 
 			// check if this is a compat or EOCDR error
 			let err = project_result.err().unwrap();
 			if match err {
-				JarError::CompatError(_) => true,
-				JarError::ZipError(async_zip::error::ZipError::UnableToLocateEOCDR) => true,
+				JarError::Compat(_) => true,
+				JarError::Zip(async_zip::error::ZipError::UnableToLocateEOCDR) => true,
 				_ => false,
 			} { // skip this project
 				eprintln!("{}", err);

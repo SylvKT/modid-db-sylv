@@ -1,13 +1,8 @@
-extern crate alloc;
-
-mod test;
-mod task;
-mod routes;
-
 use std::fs::File;
 use std::io::BufReader;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
+
 use actix_web::{App, get, HttpResponse, HttpServer, web};
 use actix_web_lab::header::StrictTransportSecurity;
 use actix_web_lab::middleware::RedirectHttps;
@@ -15,8 +10,14 @@ use ferinth::Ferinth;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
+
 use crate::routes::{ApiError, v0};
 use crate::task::retrieve_jar::jar_loop;
+
+mod test;
+mod task;
+mod routes;
+mod error;
 
 static USE_TLS: bool = true;
 
