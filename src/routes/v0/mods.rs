@@ -184,7 +184,7 @@ async fn can_search_mod(id: &str, pool: &PgPool) -> Result<bool, ApiError> {
 			Ok(false)
 		}
 	}
-	Ok(false)
+	Ok(true)
 }
 
 /// Resets the search cooldown of a mod ID
