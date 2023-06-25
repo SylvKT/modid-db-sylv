@@ -250,9 +250,9 @@ async fn get_from_id(
 			// add mod to database
 			let project = proj_id.0;
 			let id = proj_id.1;
-			let r#mod = set_or_update_mod(&project, id, pool.get_ref()).await?;
+			let r#mod = set_or_update_mod(&project, id.clone(), pool.get_ref()).await?;
 			
-			if proj_id.1 == query.id { // if the mod id is in the query
+			if id == query.id { // if the mod id is in the query
 				// add the mod to the response
 				mods.push(r#mod);
 			}
