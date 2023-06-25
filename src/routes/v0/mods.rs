@@ -15,7 +15,7 @@ use crate::routes::ApiError;
 use crate::task::retrieve_jar::{FACETS, get_id_from_jar, get_latest_jar, get_projects_and_ids};
 
 /// The search cooldown in seconds for any ID
-const SEARCH_COOLDOWN: i64 = 2 * 60;
+const SEARCH_COOLDOWN: i64 = 60 * 60;
 
 pub fn config(cfg: &mut ServiceConfig) {
 	cfg.service(
@@ -249,7 +249,7 @@ async fn get_from_id(
 			let id = proj_id.1;
 			let r#mod = set_or_update_mod(&project, id.clone(), pool.get_ref()).await?;
 			
-			if id == query.id { // if the mod id is in the query
+			if id == query.id && mods.is_empty() { // if the mod id is in the query and we don't already have it
 				// add the mod to the response
 				mods.push(r#mod);
 			}
