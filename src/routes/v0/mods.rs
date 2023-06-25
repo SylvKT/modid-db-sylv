@@ -212,7 +212,7 @@ async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiErro
 				.execute(pool).await?;
 			println!("Attempt 2");
 		} else {
-			eprintln!("{}", err.to_string());
+			println!("{}", err.to_string());
 		}
 	}
 	Ok(())
