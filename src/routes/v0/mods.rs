@@ -238,12 +238,15 @@ async fn get_from_id(
 		println!("We can search for the mod");
 		// reset our ID search cooldown
 		reset_id_search_cooldown(&*query.id, &pool).await?;
+		println!("After reset ID search cooldown");
 		// search in the modrinth query
 		let max_results = 10usize;
 		let facets: Vec<&[Facet]> = FACETS.iter().map(|term| term.as_slice()).collect();
 		let res = fer.search_paged(&*query.id, &Sort::Relevance, &Number::from(max_results), &Number::from(0usize), facets.as_slice()).await?;
+		println!("Searched");
 		let mut projects = vec![];
 		get_projects_and_ids(&res, &fer, &mut projects).await?;
+		println!("Looping through projects");
 		for proj_id in projects {
 			if proj_id.1 == query.id { // if the mod id is in the query
 				// add the mod to the response
