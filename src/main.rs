@@ -52,7 +52,7 @@ async fn main() {
 	// Start actix server
 	let server = HttpServer::new(move || {
 		App::new()
-			.wrap(RedirectHttps::default().to_port(443))
+			.wrap(RedirectHttps::with_hsts(StrictTransportSecurity::recommended()).to_port(443))
 			.app_data(web::Data::new(pool_ref.clone()))
 			.app_data(web::Data::new(fer.clone()))
 			.service(default)
