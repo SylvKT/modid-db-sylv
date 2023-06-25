@@ -194,7 +194,7 @@ async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiErro
 	let query = sqlx::query!(
 		r#"UPDATE recent_searches SET "time" = $1 WHERE id = $2"#,
 		OffsetDateTime::now_utc(),
-		id.to_string(),
+		id,
 	)
 		.execute(pool)
 		.await;
@@ -208,7 +208,7 @@ async fn reset_id_search_cooldown(id: &str, pool: &PgPool) -> Result<(), ApiErro
 			println!("Starting Attempt 2");
 			sqlx::query!(
 				r#"INSERT INTO recent_searches (id, "time") VALUES ($1, $2)"#,
-				id.to_string(),
+				id,
 				OffsetDateTime::now_utc(),
 			)
 				.execute(pool).await?;
