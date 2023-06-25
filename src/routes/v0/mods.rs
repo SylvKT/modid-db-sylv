@@ -27,6 +27,7 @@ pub fn config(cfg: &mut ServiceConfig) {
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "platform", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum Platform {
 	Modrinth,
 }
