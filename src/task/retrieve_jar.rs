@@ -18,10 +18,12 @@ const ALLOWED_LOADERS: &[&str; 2] = &["quilt", "fabric"];
 
 pub static FACETS: Lazy<Vec<Vec<Facet>>> = Lazy::new(|| {
 	let mut facets: Vec<Vec<Facet>> = vec![];
+	let mut loader_facets: Vec<Facet> = vec![];
 	
 	for loader in ALLOWED_LOADERS {
-		facets.push(vec![Facet::Categories(String::from(*loader))]);
+		loader_facets.push(Facet::Categories(String::from(*loader)));
 	}
+	facets.push(loader_facets);
 	facets.push(vec![Facet::ProjectType(ProjectType::Mod)]);
 	facets
 });

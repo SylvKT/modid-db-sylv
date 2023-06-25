@@ -241,12 +241,9 @@ async fn get_from_id(
 		let max_results = 10usize;
 		let facets: Vec<&[Facet]> = FACETS.iter().map(|term| term.as_slice()).collect();
 		let res = fer.search_paged(&*query.id, &Sort::Relevance, &Number::from(max_results), &Number::from(0usize), facets.as_slice()).await?;
-		println!("Searched");
 		let mut projects = vec![];
 		get_projects_and_ids(&res, &fer, &mut projects).await?;
-		println!("Looping through projects");
 		for proj_id in projects {
-			println!("Found mod with ID {}", proj_id.1);
 			// add mod to database
 			let project = proj_id.0;
 			let id = proj_id.1;
