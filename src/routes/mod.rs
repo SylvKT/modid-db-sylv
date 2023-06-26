@@ -5,13 +5,13 @@ use actix_web::body::BoxBody;
 use actix_web::http::StatusCode;
 use serde::Serialize;
 
-use crate::error::VariantName;
+use crate::util::VariantName;
 use crate::task::retrieve_jar::JarError;
 
 pub mod v0;
 
 #[derive(Debug, Serialize)]
-struct AppErrorResponse {
+struct ApiErrorResponse {
 	error_code: u16,
 	error_type: String,
 	description: String,
@@ -60,7 +60,7 @@ impl ResponseError for ApiError {
 	}
 	
 	fn error_response(&self) -> HttpResponse<BoxBody> {
-		HttpResponse::build(self.status_code()).json(AppErrorResponse {
+		HttpResponse::build(self.status_code()).json(ApiErrorResponse {
 			error_code: self.status_code().as_u16(),
 			error_type: self.variant_name().to_string(),
 			description: self.to_string(),

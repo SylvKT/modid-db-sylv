@@ -17,7 +17,7 @@ use crate::task::retrieve_jar::jar_loop;
 mod test;
 mod task;
 mod routes;
-mod error;
+mod util;
 
 static USE_TLS: bool = true;
 
