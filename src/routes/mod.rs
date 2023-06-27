@@ -30,6 +30,10 @@ pub enum ApiError {
 	Io(#[from] std::io::Error),
 	#[error("RusTLS Error: {0}")]
 	RusTLS(#[from] rustls::Error),
+	#[error("Bad Request: {0}")]
+	BadRequest(String),
+	#[error("Not Found: {0}")]
+	NotFound(String),
 	#[error("Other: {0}")]
 	Other(String),
 }
@@ -42,6 +46,8 @@ impl VariantName for ApiError {
 			ApiError::JarError(err) => err.variant_name(),
 			ApiError::Io(..) => "io",
 			ApiError::RusTLS(..) => "rustls",
+			ApiError::BadRequest(..) => "bad_request",
+			ApiError::NotFound(..) => "not_found",
 			ApiError::Other(..) => "other",
 		}
 	}
@@ -55,6 +61,8 @@ impl ResponseError for ApiError {
 			ApiError::JarError(..) => StatusCode::INTERNAL_SERVER_ERROR,
 			ApiError::Io(..) => StatusCode::INTERNAL_SERVER_ERROR,
 			ApiError::RusTLS(..) => StatusCode::INTERNAL_SERVER_ERROR,
+			ApiError::BadRequest(..) => StatusCode::BAD_REQUEST,
+			ApiError::NotFound(..) => StatusCode::NOT_FOUND,
 			ApiError::Other(..) => StatusCode::INTERNAL_SERVER_ERROR,
 		}
 	}

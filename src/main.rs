@@ -4,8 +4,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use actix_web::{App, get, HttpResponse, HttpServer, web};
+use actix_web::http::StatusCode;
 use actix_web_lab::header::StrictTransportSecurity;
 use actix_web_lab::middleware::RedirectHttps;
+use actix_web::middleware::ErrorHandlers;
 use ferinth::Ferinth;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use serde::{Deserialize, Serialize};
@@ -13,11 +15,13 @@ use sqlx::postgres::PgPoolOptions;
 
 use crate::routes::{ApiError, v0};
 use crate::task::retrieve_jar::jar_loop;
+use crate::error::{handle_400, handle_404};
 
 mod test;
 mod task;
 mod routes;
 mod util;
+mod error;
 
 static USE_TLS: bool = true;
 
@@ -57,6 +61,8 @@ async fn main() {
 			.app_data(web::Data::new(pool_ref.clone()))
 			.app_data(web::Data::new(fer.clone()))
 			.service(default)
+			.wrap(ErrorHandlers::new().handler(StatusCode::BAD_REQUEST, handle_400))
+			.wrap(ErrorHandlers::new().handler(StatusCode::NOT_FOUND, handle_404))
 			.configure(v0::config)
 	});
 	
