@@ -49,11 +49,12 @@ async fn main() {
 		.build()
 		.expect("Failed to create tokio runtime \"jar-scan\"");
 	
-	let handle = runtime.spawn_blocking(|| {
+	runtime.spawn_blocking(|| {
 		jar_loop(pool)
 	})
 		.await
-		.expect("Blocking jar retrieval task panicked");
+		.expect("Blocking jar retrieval task panicked")
+		.await;
 	
 	// Start actix server
 	let server = HttpServer::new(move || {
@@ -87,9 +88,6 @@ async fn main() {
 			.await
 			.expect("Server panicked");
 	}
-	
-	handle
-		.await;
 }
 
 fn load_certs() -> Result<rustls::ServerConfig, ApiError> {
