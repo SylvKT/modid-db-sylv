@@ -13,7 +13,7 @@ use sqlx::{PgPool, query, query_as};
 use time::OffsetDateTime;
 use tokio::io::AsyncWriteExt;
 
-use crate::error::VariantName;
+use crate::util::VariantName;
 use crate::routes;
 use crate::routes::v0::mods::Platform;
 
