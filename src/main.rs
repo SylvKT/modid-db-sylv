@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::thread;
 use std::time::Duration;
 
 use actix_web::{App, get, HttpResponse, HttpServer, web};
@@ -41,20 +42,9 @@ async fn main() {
 	let fer = Ferinth::new("SylvKT@github.com/modid-db-sylv", None, Some("mailto:contact@sylv.gay") /* just in case they didn't get the memo */, None).expect("Failed to create Ferinth instance");
 
 	// Spawn other runtimes
-	let runtime = tokio::runtime::Builder::new_multi_thread()
-		.enable_time()
-		.enable_io()
-		.worker_threads(1)
-		.thread_name("jar-scan")
-		.build()
-		.expect("Failed to create tokio runtime \"jar-scan\"");
-	
-	runtime.spawn_blocking(|| {
+	let jar_loop_handle = thread::spawn(|| {
 		jar_loop(pool)
-	})
-		.await
-		.expect("Blocking jar retrieval task panicked")
-		.await;
+	});
 	
 	// Start actix server
 	let server = HttpServer::new(move || {
@@ -67,6 +57,8 @@ async fn main() {
 			.wrap(ErrorHandlers::new().handler(StatusCode::NOT_FOUND, handle_404))
 			.configure(v0::config)
 	});
+	
+	println!("Server starting");
 	
 	if USE_TLS {
 		let certs = load_certs()
@@ -88,6 +80,8 @@ async fn main() {
 			.await
 			.expect("Server panicked");
 	}
+	
+	drop(jar_loop_handle); // drops the thread entirely so we can exit properly
 }
 
 fn load_certs() -> Result<rustls::ServerConfig, ApiError> {
