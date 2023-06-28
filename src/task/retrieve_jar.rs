@@ -69,6 +69,7 @@ pub enum CompatError {
 }
 
 pub async fn jar_loop(pool: PgPool) {
+	println!("Began Jar Retrieval Loop");
 	let mut interval = tokio::time::interval(Duration::from_secs(30 * 60));
 	loop {
 		if OffsetDateTime::from(SystemTime::now()).minute() % 30 == 0 {

@@ -46,9 +46,10 @@ async fn main() {
 		.expect("Failed to create tokio runtime \"jar-scan\"");
 	
 	let handle = runtime.spawn_blocking(|| {
-		println!("Began Jar Retrieval Loop");
 		jar_loop(pool)
-	});
+	})
+		.await
+		.expect("Blocking jar retrieval task panicked");
 	
 	// Start actix server
 	let server = HttpServer::new(move || {
@@ -82,8 +83,6 @@ async fn main() {
 	}
 	
 	handle
-		.await
-		.expect("Blocking jar retrieval task panicked")
 		.await;
 }
 
