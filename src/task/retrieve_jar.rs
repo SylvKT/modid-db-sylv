@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -131,10 +132,10 @@ pub async fn get_latest_jar(fer: &Ferinth, project_id: &ID) -> Result<(Project, 
 	Ok((project, hit_version_file?.unwrap()))
 }
 
-pub async fn get_id_from_jar(path: PathBuf) -> Result<String, JarError> {
+pub async fn get_id_from_jar(path: PathBuf) -> Result<Vec<String>, JarError> {
 	// Retrieve the mod ID from the fabric.mod.json or quilt.mod.json
-	let id: Result<String, JarError> = { // i'm documenting this code for your dumb ass because i know you'll forget about it
-		let mut id_ret = String::new(); // we return this later; this is the id
+	let id: Result<Vec<String>, JarError> = { // i'm documenting this code for your dumb ass because i know you'll forget about it
+		let mut id_ret = vec![]; // we return this later; this is the id
 		// get id from latest version
 		let mut file = tokio::fs::File::open(path.clone()).await?;
 		// open zip reader (with tokio)
@@ -156,10 +157,11 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<String, JarError> {
 					#[derive(Deserialize)]
 					struct Fmj {
 						id: String,
+						provides: HashMap<String, String>,
 					}
 					let fmj: Fmj = serde_json::from_str(string.as_ref())
 						.expect("Failed to deserialize quilt.mod.json");
-					id_ret = fmj.id;
+					id_ret.push(fmj.id);
 				},
 				"quilt.mod.json" => {
 					#[derive(Deserialize)]
@@ -172,7 +174,7 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<String, JarError> {
 					}
 					let qmj: Qmj = serde_json::from_str(string.as_ref())
 						.expect("Failed to deserialize quilt.mod.json");
-					id_ret = qmj.quilt_loader.id;
+					id_ret.push(qmj.quilt_loader.id);
 				},
 				_ => {}
 			}
