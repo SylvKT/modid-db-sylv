@@ -132,10 +132,11 @@ pub async fn get_latest_jar(fer: &Ferinth, project_id: &ID) -> Result<(Project, 
 	Ok((project, hit_version_file?.unwrap()))
 }
 
-pub async fn get_id_from_jar(path: PathBuf) -> Result<Vec<String>, JarError> {
+pub async fn get_id_from_jar(path: PathBuf) -> Result<(String, Vec<String>), JarError> {
 	// Retrieve the mod ID from the fabric.mod.json or quilt.mod.json
-	let id: Result<Vec<String>, JarError> = { // i'm documenting this code for your dumb ass because i know you'll forget about it
-		let mut id_ret = vec![]; // we return this later; this is the id
+	let ret: Result<(String, Vec<String>), JarError> = { // i'm documenting this code for your dumb ass because i know you'll forget about it -- thanks <3
+		let mut id = String::new(); // we return this later; this is the id
+		let mut provided = vec![]; // we return this later; these are the provided IDs
 		// get id from latest version
 		let mut file = tokio::fs::File::open(path.clone()).await?;
 		// open zip reader (with tokio)
@@ -161,12 +162,16 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<Vec<String>, JarError> {
 					}
 					let fmj: Fmj = serde_json::from_str(string.as_ref())
 						.expect("Failed to deserialize quilt.mod.json");
-					id_ret.push(fmj.id);
+					id.push_str(fmj.id.as_str());
+					for (id, _) in fmj.provides {
+						provided.push(id)
+					}
 				},
 				"quilt.mod.json" => {
 					#[derive(Deserialize)]
 					struct Ql {
 						id: String,
+						provides: HashMap<String, String>,
 					}
 					#[derive(Deserialize)]
 					struct Qmj {
@@ -174,22 +179,25 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<Vec<String>, JarError> {
 					}
 					let qmj: Qmj = serde_json::from_str(string.as_ref())
 						.expect("Failed to deserialize quilt.mod.json");
-					id_ret.push(qmj.quilt_loader.id);
+					id.push_str(qmj.quilt_loader.id.as_str());
+					for (id, _) in qmj.quilt_loader.provides {
+						provided.push(id)
+					}
 				},
 				_ => {}
 			}
 		}
-		if id_ret.is_empty() {
+		if id.is_empty() {
 			println!("Mod has no fabric.mod.json or quilt.mod.json");
 		}
 		tokio::fs::remove_file(&*path).await?;
-		Ok(id_ret)
+		Ok((id, provided))
 	};
 	
-	Ok(id?)
+	Ok(ret?)
 }
 
-pub async fn get_projects_and_ids(res: &Response, fer: &Ferinth, projects: &mut Vec<(Project, String)>) -> Result<(), JarError> {
+pub async fn get_projects_and_ids(res: &Response, fer: &Ferinth, projects: &mut Vec<(Project, (String, Vec<String>))>) -> Result<(), JarError> {
 	for hit in res.hits.iter() {
 		let (project, path) = get_latest_jar(&fer, &hit.project_id).await?;
 		let project_result = get_id_from_jar(path).await;
@@ -221,7 +229,7 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	let fer = Ferinth::new("SylvKT@github.com/modid-db-sylv", None, Some("mailto:contact@sylv.gay") /* just in case they didn't get the memo */, None)?;
 	
 	// Request each project's latest .jar
-	let mut projects: Vec<(Project, String)> = vec![];
+	let mut projects: Vec<(Project, (String, Vec<String>))> = vec![];
 	
 	// Request newest projects
 	let res = fer.search("", &Sort::Newest, facets.as_slice()).await?;
@@ -236,11 +244,13 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 	// second chance
 	get_projects_and_ids(&res, &fer, &mut projects).await?;
 	
-	for (project, id) in projects {
+	for (project, ids) in projects {
+		let id = ids.0;
+		let provides = ids.1;
 		// query database with project id
 		let mod_opt = query_as!(
 			routes::v0::mods::Mod,
-			r#"SELECT id, project_id, platform as "platform: _" FROM mods WHERE project_id = $1"#,
+			r#"SELECT id, project_id, platform as "platform: _", provides FROM mods WHERE project_id = $1"#,
 			project.id.to_string()
 		)
 			.fetch_optional(&*pool).await?;
@@ -248,9 +258,10 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 			if r#mod.id != id { // if this mod ID is new (doesn't match)
 				// update the mod ID
 				query!(
-					"UPDATE mods SET id = $1 WHERE project_id = $2",
+					"UPDATE mods SET id = $1, provides = $3 WHERE project_id = $2",
 					id,
-					project.id.to_string()
+					project.id.to_string(),
+					provides.as_slice(),
 				)
 					.execute(&*pool).await?;
 			}
@@ -260,9 +271,17 @@ pub async fn get_fucking_jars(pool: &PgPool) -> Result<(), JarError> {
 				r#"INSERT INTO mods (id, project_id, platform) VALUES ($1, $2, $3)"#,
 				id,
 				project.id.to_string(),
-				Platform::Modrinth as Platform
+				Platform::Modrinth as Platform,
 			)
 				.execute(&*pool).await?;
+			if !provides.is_empty() {
+				query!(
+					r#"UPDATE mods SET provides = $1 WHERE project_id = $2"#,
+					provides.as_slice(),
+					project.id.to_string(),
+				)
+					.execute(&*pool).await?;
+			}
 		}
 	}
 	

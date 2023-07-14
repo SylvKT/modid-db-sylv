@@ -36,13 +36,16 @@ pub enum Platform {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// A mod in the database.
+/// TODO: add "provided" field to the DB
 pub struct Mod {
 	/// The mod's mod loader ID.
 	pub id: String,
 	/// The project ID in the format of the given platform.
-	pub project_id: String,
+	pub project_id: Option<String>,
 	/// The platform on which this mod resides.
 	pub platform: Platform,
+	/// Any mods provided via `provides`.
+	pub provides: Option<Vec<String>>,
 }
 
 // BEGIN TOMFUCKERY
@@ -52,8 +55,8 @@ impl ::sqlx::encode::Encode<'_, sqlx::Postgres> for Mod
 	where
 		String: for<'q> ::sqlx::encode::Encode<'q, sqlx::Postgres>,
 		String: ::sqlx::types::Type<sqlx::Postgres>,
-		String: for<'q> ::sqlx::encode::Encode<'q, sqlx::Postgres>,
-		String: ::sqlx::types::Type<sqlx::Postgres>,
+		Option<String>: for<'q> ::sqlx::encode::Encode<'q, sqlx::Postgres>,
+		Option<String>: ::sqlx::types::Type<sqlx::Postgres>,
 		Platform: for<'q> ::sqlx::encode::Encode<'q, sqlx::Postgres>,
 		Platform: ::sqlx::types::Type<sqlx::Postgres>,
 {
@@ -73,12 +76,15 @@ impl ::sqlx::encode::Encode<'_, sqlx::Postgres> for Mod
 			+ <String as ::sqlx::encode::Encode<
 			sqlx::Postgres,
 		>>::size_hint(&self.id)
-			+ <String as ::sqlx::encode::Encode<
+			+ <Option<String> as ::sqlx::encode::Encode<
 			sqlx::Postgres,
 		>>::size_hint(&self.project_id)
 			+ <Platform as ::sqlx::encode::Encode<
 			sqlx::Postgres,
 		>>::size_hint(&self.platform)
+			+ <Option<Vec<String>> as ::sqlx::encode::Encode<
+			sqlx::Postgres,
+		>>::size_hint(&self.provides)
 	}
 }
 
@@ -88,8 +94,8 @@ impl<'r> sqlx::decode::Decode<'r, sqlx::Postgres> for Mod
 	where
 		String: sqlx::types::Type<sqlx::Postgres>,
 		String: sqlx::types::Type<sqlx::Postgres>,
-		String: sqlx::types::Type<sqlx::Postgres>,
-		String: sqlx::types::Type<sqlx::Postgres>,
+		Option<String>: sqlx::types::Type<sqlx::Postgres>,
+		Option<String>: sqlx::types::Type<sqlx::Postgres>,
 		Platform: sqlx::decode::Decode<'r, sqlx::Postgres>,
 		Platform: sqlx::types::Type<sqlx::Postgres>,
 {
@@ -105,12 +111,14 @@ impl<'r> sqlx::decode::Decode<'r, sqlx::Postgres> for Mod
 			value,
 		)?;
 		let id = decoder.try_decode::<String>()?;
-		let project_id = decoder.try_decode::<String>()?;
+		let project_id = decoder.try_decode::<Option<String>>()?;
 		let platform = decoder.try_decode::<Platform>()?;
+		let provides = decoder.try_decode::<Option<Vec<String>>>()?;
 		Ok(Mod {
 			id,
 			project_id,
 			platform,
+			provides,
 		})
 	}
 }
@@ -138,42 +146,69 @@ struct RecentSearch {
 }
 
 /// This queries the database for the given project ID and either adds it or updates it depending on if it exists
-async fn set_or_update_mod(project: &Project, id: String, pool: &PgPool) -> Result<Mod, ApiError> {
+async fn set_or_update_mod(project: &Project, id: String, mut provides: Vec<String>, pool: &PgPool) -> Result<Mod, ApiError> {
 	if id.len() == 0 {
 		return Err(ApiError::Other("Failed to extract mod ID".to_string()))
 	}
 	// query database with project id
 	let mod_opt = sqlx::query_as!(
-				Mod,
-				r#"SELECT id, project_id, platform as "platform: _" FROM mods WHERE project_id = $1"#,
-				project.id.to_string()
-			)
+			Mod,
+			r#"SELECT id, project_id, platform as "platform: _", provides FROM mods WHERE project_id = $1"#,
+			project.id.to_string()
+		)
 		.fetch_optional(pool).await?;
-	if let Some(r#mod) = mod_opt { // if the mod exists in the database
-		if r#mod.id != id { // if this mod ID is new (doesn't match)
-			// update the mod ID
-			sqlx::query!(
-						"UPDATE mods SET id = $1 WHERE project_id = $2",
-						id,
-						project.id.to_string()
-					)
-				.execute(pool).await?;
+	let mut found_provides = vec![];
+	let mut has_provides = false;
+
+	if let Some(r#mod) = mod_opt { // if the mod exists
+		if r#mod.provides.is_some() {
+			has_provides = true;
+			found_provides.append(&mut r#mod.provides.unwrap());
 		}
+		// update the mod ID
+		sqlx::query!(
+			"UPDATE mods SET id = $1 WHERE project_id = $2",
+			id,
+			project.id.to_string()
+		)
+			.execute(&*pool).await?;
 	} else {
 		// add mod to database
 		sqlx::query!(
-					r#"INSERT INTO mods (id, project_id, platform) VALUES ($1, $2, $3)"#,
-					id,
-					project.id.to_string(),
-					Platform::Modrinth as Platform
-				)
+			r#"INSERT INTO mods (id, project_id, platform) VALUES ($1, $2, $3)"#,
+			id,
+			project.id.to_string(),
+			Platform::Modrinth as Platform,
+		)
 			.execute(pool).await?;
+		if has_provides {
+			sqlx::query!(
+				r#"UPDATE mods SET provides = $1 WHERE project_id = $2"#,
+				found_provides.as_slice(),
+				project.id.to_string(),
+			)
+				.execute(pool).await?;
+		}
 	}
+	
+	let mut found_provides2 = None;
+	if has_provides {
+		if !provides.is_empty() {
+			found_provides.append(&mut provides);
+		}
+		found_provides2 = Some(found_provides);
+	} else {
+		if !provides.is_empty() {
+			found_provides2 = Some(provides);
+		}
+	}
+	let found_provides = found_provides2;
 	
 	let r#mod = Mod {
 		id,
-		project_id: project.id.clone(),
+		project_id: Some(project.id.clone()),
 		platform: Platform::Modrinth,
+		provides: found_provides,
 	};
 	Ok(r#mod)
 }
@@ -239,7 +274,7 @@ async fn get_from_id(
 ) -> Result<HttpResponse, ApiError> {
 	let mut mods = sqlx::query_as!(
 		Mod,
-		r#"SELECT id, project_id, platform as "platform: _" FROM mods WHERE id = $1;"#,
+		r#"SELECT id, project_id, platform as "platform: _", provides FROM mods WHERE id = $1 OR provides @> ARRAY[$1]::varchar[];"#,
 		query.id,
 	)
 		.fetch_all(&**pool)
@@ -257,8 +292,10 @@ async fn get_from_id(
 		for proj_id in projects {
 			// add mod to database
 			let project = proj_id.0;
-			let id = proj_id.1;
-			let r#mod = set_or_update_mod(&project, id.clone(), pool.get_ref()).await?;
+			let ids = proj_id.1;
+			let id = ids.0;
+			let provides = ids.1;
+			let r#mod = set_or_update_mod(&project, id.clone(), provides, pool.get_ref()).await?;
 			
 			if id == query.id && mods.is_empty() { // if the mod id is in the query and we don't already have it
 				// add the mod to the response
@@ -280,7 +317,7 @@ async fn get_from_project_id(
 ) -> Result<HttpResponse, ApiError> {
 	let mods = sqlx::query_as!(
 		Mod,
-		r#"SELECT id, project_id, platform as "platform: _" FROM mods WHERE project_id = $1;"#,
+		r#"SELECT id, project_id, platform as "platform: _", provides FROM mods WHERE project_id = $1;"#,
 		path.clone(),
 	)
 		.fetch_one(&**pool)
@@ -292,8 +329,10 @@ async fn get_from_project_id(
 			_ => false,
 		} { // download mod and add id to database
 			let (project, path) = get_latest_jar(fer.as_ref(), &*path).await?;
-			let id = get_id_from_jar(path).await?;
-			let r#mod = set_or_update_mod(&project, id, pool.get_ref()).await;
+			let ids = get_id_from_jar(path).await?;
+			let id = ids.0;
+			let provides = ids.1;
+			let r#mod = set_or_update_mod(&project, id, provides, pool.get_ref()).await;
 			let res = HttpResponse::Ok()
 				.json(r#mod?);
 			Ok(res)
