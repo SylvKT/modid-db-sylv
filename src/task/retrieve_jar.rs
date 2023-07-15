@@ -169,9 +169,13 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<(String, Vec<String>), Jar
 				},
 				"quilt.mod.json" => {
 					#[derive(Deserialize)]
+					struct ProvidesObject {
+						id: String,
+					}
+					#[derive(Deserialize)]
 					struct Ql {
 						id: String,
-						provides: HashMap<String, String>,
+						provides: Vec<ProvidesObject>,
 					}
 					#[derive(Deserialize)]
 					struct Qmj {
@@ -180,8 +184,8 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<(String, Vec<String>), Jar
 					let qmj: Qmj = serde_json::from_str(string.as_ref())
 						.expect("Failed to deserialize quilt.mod.json");
 					id.push_str(qmj.quilt_loader.id.as_str());
-					for (id, _) in qmj.quilt_loader.provides {
-						provided.push(id)
+					for provides in qmj.quilt_loader.provides {
+						provided.push(provides.id)
 					}
 				},
 				_ => {}
