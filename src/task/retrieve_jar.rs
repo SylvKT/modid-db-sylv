@@ -158,13 +158,15 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<(String, Vec<String>), Jar
 					#[derive(Deserialize)]
 					struct Fmj {
 						id: String,
-						provides: HashMap<String, String>,
+						provides: Option<HashMap<String, String>>,
 					}
 					let fmj: Fmj = serde_json::from_str(string.as_ref())
-						.expect("Failed to deserialize quilt.mod.json");
+						.expect("Failed to deserialize fabric.mod.json");
 					id.push_str(fmj.id.as_str());
-					for (id, _) in fmj.provides {
-						provided.push(id)
+					if let Some(provides) = fmj.provides {
+						for (id, _) in provides {
+							provided.push(id)
+						}
 					}
 				},
 				"quilt.mod.json" => {
@@ -175,7 +177,7 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<(String, Vec<String>), Jar
 					#[derive(Deserialize)]
 					struct Ql {
 						id: String,
-						provides: Vec<ProvidesObject>,
+						provides: Option<Vec<ProvidesObject>>,
 					}
 					#[derive(Deserialize)]
 					struct Qmj {
@@ -184,8 +186,10 @@ pub async fn get_id_from_jar(path: PathBuf) -> Result<(String, Vec<String>), Jar
 					let qmj: Qmj = serde_json::from_str(string.as_ref())
 						.expect("Failed to deserialize quilt.mod.json");
 					id.push_str(qmj.quilt_loader.id.as_str());
-					for provides in qmj.quilt_loader.provides {
-						provided.push(provides.id)
+					if let Some(provides) = qmj.quilt_loader.provides {
+						for provides_obj in provides {
+							provided.push(provides_obj.id)
+						}
 					}
 				},
 				_ => {}
