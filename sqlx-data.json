@@ -1,6 +1,20 @@
 {
   "db": "PostgreSQL",
-  "15c7f5d1eff73017725f418ba95f5ef9e747f9169b5ef8d89f83699d26cae752": {
+  "31f8b9710268e53c4853250e3891097d8b7bf39bc7a91404035f10e7a5c29fba": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Text",
+          "VarcharArray"
+        ]
+      }
+    },
+    "query": "UPDATE mods SET id = $1, provides = $3 WHERE project_id = $2"
+  },
+  "348112941d29cc221897cc784849b33fe9537d69b648362f98bf70ab298ce459": {
     "describe": {
       "columns": [
         {
@@ -26,12 +40,18 @@
               "name": "platform"
             }
           }
+        },
+        {
+          "name": "provides",
+          "ordinal": 3,
+          "type_info": "VarcharArray"
         }
       ],
       "nullable": [
         false,
+        true,
         false,
-        false
+        true
       ],
       "parameters": {
         "Left": [
@@ -39,7 +59,7 @@
         ]
       }
     },
-    "query": "SELECT id, project_id, platform as \"platform: _\" FROM mods WHERE project_id = $1;"
+    "query": "SELECT id, project_id, platform as \"platform: _\", provides FROM mods WHERE id = $1 OR provides @> ARRAY[$1]::varchar[];"
   },
   "393d00d490dd911fc76893a2eb42fb373fe6f5224a5bae2e4e5343061c39ab94": {
     "describe": {
@@ -80,6 +100,19 @@
     },
     "query": "SELECT id, \"time\" FROM recent_searches WHERE id = $1"
   },
+  "5603d8358f8b548530084ec657fe73937d7e265e8f293e5e01c290548e98d266": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "VarcharArray",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE mods SET provides = $1 WHERE project_id = $2"
+  },
   "798a049a8238530f5d830a7b366bb6a72e134d1b7a9022ed4285ef18aff609af": {
     "describe": {
       "columns": [
@@ -100,20 +133,7 @@
     },
     "query": "SELECT id FROM recent_searches WHERE id = $1"
   },
-  "9ab2351551cdf4fc539360f598452dbd059d64caaa7e2d7035db457020e06d36": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Text"
-        ]
-      }
-    },
-    "query": "UPDATE mods SET id = $1 WHERE project_id = $2"
-  },
-  "a0401e75266a2af907cf3477ae525cd949bee602dd44dc9f9c994b7f80d8dab0": {
+  "83497cb97c1dc6b1aca4bdba9c45700ee30731b7b53e5b50734a39468d274ce4": {
     "describe": {
       "columns": [
         {
@@ -139,12 +159,18 @@
               "name": "platform"
             }
           }
+        },
+        {
+          "name": "provides",
+          "ordinal": 3,
+          "type_info": "VarcharArray"
         }
       ],
       "nullable": [
         false,
+        true,
         false,
-        false
+        true
       ],
       "parameters": {
         "Left": [
@@ -152,7 +178,20 @@
         ]
       }
     },
-    "query": "SELECT id, project_id, platform as \"platform: _\" FROM mods WHERE project_id = $1"
+    "query": "SELECT id, project_id, platform as \"platform: _\", provides FROM mods WHERE project_id = $1"
+  },
+  "9ab2351551cdf4fc539360f598452dbd059d64caaa7e2d7035db457020e06d36": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE mods SET id = $1 WHERE project_id = $2"
   },
   "b319e122d875f76c0a198761b738adfbcc98cedc75eff511096eb546de28600f": {
     "describe": {
@@ -190,7 +229,7 @@
     },
     "query": "INSERT INTO mods (id, project_id, platform) VALUES ($1, $2, $3)"
   },
-  "fb14705b2dfe24555a88fa7ed9d7ba9a953332934d3ad39a2747723264ecc9ce": {
+  "e80c9459d3bd6aa622b75f1fe6c8e2344bf6e536f86e8d355eb7f694feef7aea": {
     "describe": {
       "columns": [
         {
@@ -216,12 +255,18 @@
               "name": "platform"
             }
           }
+        },
+        {
+          "name": "provides",
+          "ordinal": 3,
+          "type_info": "VarcharArray"
         }
       ],
       "nullable": [
         false,
+        true,
         false,
-        false
+        true
       ],
       "parameters": {
         "Left": [
@@ -229,6 +274,6 @@
         ]
       }
     },
-    "query": "SELECT id, project_id, platform as \"platform: _\" FROM mods WHERE id = $1;"
+    "query": "SELECT id, project_id, platform as \"platform: _\", provides FROM mods WHERE project_id = $1;"
   }
 }
